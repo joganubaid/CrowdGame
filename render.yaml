@@ -1,0 +1,27 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# One-time setup: on Render, New → Blueprint → connect this repo. Render builds
+# the Dockerfile and, with autoDeploy, redeploys on every push to main.
+# Render runs a persistent container with native WebSocket support and
+# terminates TLS at its edge (the app runs HTTP in production), so the
+# Socket.io server works as-is — no code changes needed.
+services:
+  - type: web
+    name: crowdplay
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free          # free web services sleep after ~15 min idle; first hit wakes it
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Run in-memory: Render's free disk is ephemeral, so the SQLite file
+      # wouldn't persist anyway. This also avoids loading the sqlite3 native
+      # binary in the slim image. Set DATABASE_URL instead for real persistence.
+      - key: USE_SQLITE_FALLBACK
+        value: "false"
+      - key: JWT_SECRET
+        generateValue: true   # Render generates a strong secret
+      - key: ADMIN_PASSWORD
+        value: admin123        # change in the Render dashboard for a real deployment
