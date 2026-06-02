@@ -36,6 +36,54 @@ document.addEventListener('DOMContentLoaded', () => {
   const resetRoomBtn = document.getElementById('resetRoomBtn');
   const consoleLog = document.getElementById('consoleLog');
 
+  // Word cloud controls
+  const activityType = document.getElementById('activityType');
+  const jigsawConfig = document.getElementById('jigsawConfig');
+  const wordcloudConfig = document.getElementById('wordcloudConfig');
+  const wcPromptInput = document.getElementById('wcPromptInput');
+  const wcResponseFormat = document.getElementById('wcResponseFormat');
+  const wcMaxSubmissions = document.getElementById('wcMaxSubmissions');
+  const closeWordcloudBtn = document.getElementById('closeWordcloudBtn');
+  const moderationPanel = document.getElementById('moderationPanel');
+  const moderationList = document.getElementById('moderationList');
+  const progressMetricLabel = document.getElementById('progressMetricLabel');
+
+  // Toggle config block to match selected mode.
+  function syncActivityConfigVisibility() {
+    const isWordCloud = activityType.value === 'wordcloud';
+    wordcloudConfig.classList.toggle('hidden', !isWordCloud);
+    jigsawConfig.classList.toggle('hidden', isWordCloud);
+  }
+  activityType.addEventListener('change', syncActivityConfigVisibility);
+  syncActivityConfigVisibility();
+
+  // Render the live moderation list; each row can be hidden from the cloud.
+  function renderModerationList(responses) {
+    if (!responses.length) {
+      moderationList.innerHTML = '<span class="moderation-empty">No responses yet.</span>';
+      return;
+    }
+    moderationList.innerHTML = '';
+    responses.slice().reverse().forEach((r) => {
+      const row = document.createElement('div');
+      row.className = 'moderation-row';
+      const text = document.createElement('span');
+      text.className = 'moderation-text';
+      text.textContent = r.text;
+      text.title = `by ${r.displayName}`;
+      const btn = document.createElement('button');
+      btn.className = 'moderation-remove';
+      btn.textContent = '✕';
+      btn.setAttribute('aria-label', `Hide response: ${r.text}`);
+      btn.addEventListener('click', () => {
+        socket.emit('admin-remove-response', { roomCode: activeRoomCode, responseId: r.id });
+      });
+      row.appendChild(text);
+      row.appendChild(btn);
+      moderationList.appendChild(row);
+    });
+  }
+
   // Helper to log console messages
   function consoleLogMsg(msg) {
     const time = new Date().toLocaleTimeString();
@@ -109,6 +157,12 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('error-message', (msg) => {
       consoleLogMsg(`[ERROR] ${msg}`);
       if (window.crowdOverlay) { window.crowdOverlay('Something went wrong', msg); } else { alert(msg); }
+    });
+
+    // Word Cloud: refresh live count + moderation list.
+    socket.on('wordcloud-update', (state) => {
+      puzzleProgress.textContent = state.totalResponses;
+      renderModerationList(state.responses || []);
     });
   }
 
@@ -235,24 +289,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Start the puzzle activity!
+  // Map word-cloud response-format to a character limit.
+  const WC_CHAR_LIMITS = { '1word': 20, 'phrase': 80, 'sentence': 280 };
+
+  // Start the selected activity!
   startActivityBtn.addEventListener('click', () => {
     if (!activeRoomCode || !socket) return;
-    
-    const rows = parseInt(gridRows.value) || 4;
-    const cols = parseInt(gridCols.value) || 6;
-    
-    socket.emit('admin-start-activity', {
-      roomCode: activeRoomCode,
-      rows,
-      cols,
-      imageUrl: uploadedImageUrl // Null means it uses the default server-generated synthwave image
-    });
 
-    consoleLogMsg(`Activity jigsaw triggered (grid: ${rows}x${cols}). Slicing image...`);
+    if (activityType.value === 'wordcloud') {
+      const prompt = wcPromptInput.value.trim() || 'Describe today in one word';
+      const maxChars = WC_CHAR_LIMITS[wcResponseFormat.value] || 80;
+      const maxSubmissions = parseInt(wcMaxSubmissions.value) || 3;
+
+      socket.emit('admin-start-activity', {
+        roomCode: activeRoomCode,
+        activityType: 'wordcloud',
+        prompt, maxChars, maxSubmissions
+      });
+
+      consoleLogMsg(`Word Cloud triggered — prompt: "${prompt}" (${maxChars} chars, ${maxSubmissions}/person).`);
+      progressMetricLabel.textContent = 'Responses';
+      puzzleProgress.textContent = '0';
+      moderationPanel.classList.remove('hidden');
+      closeWordcloudBtn.classList.remove('hidden');
+    } else {
+      const rows = parseInt(gridRows.value) || 4;
+      const cols = parseInt(gridCols.value) || 6;
+
+      socket.emit('admin-start-activity', {
+        roomCode: activeRoomCode,
+        activityType: 'jigsaw',
+        rows, cols,
+        imageUrl: uploadedImageUrl // Null = default server-generated image
+      });
+
+      consoleLogMsg(`Activity jigsaw triggered (grid: ${rows}x${cols}). Slicing image...`);
+    }
+
     activeRoomStatusDisp.textContent = 'ACTIVE';
     activeRoomStatusDisp.className = 'value status-badge active';
     startActivityBtn.disabled = true;
+  });
+
+  // Close the word cloud and reveal the summary on the big screen.
+  closeWordcloudBtn.addEventListener('click', () => {
+    if (!activeRoomCode || !socket) return;
+    if (!confirm('Close the word cloud and show the final results on the big screen?')) return;
+    socket.emit('admin-close-activity', { roomCode: activeRoomCode });
+    consoleLogMsg('Word Cloud closed — revealing summary on the big screen.');
+    activeRoomStatusDisp.textContent = 'COMPLETED';
+    activeRoomStatusDisp.className = 'value status-badge completed';
+    closeWordcloudBtn.disabled = true;
   });
 
   // Reset the room session

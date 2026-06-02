@@ -216,11 +216,13 @@ class RoomManager {
     if (!room) return { success: false, error: 'Room not found' };
 
     room.status = 'active';
-    
+
     // Dynamically instantiate activity class
     let ActivityClass;
     if (activityType === 'jigsaw') {
       ActivityClass = require('../activities/jigsaw');
+    } else if (activityType === 'wordcloud') {
+      ActivityClass = require('../activities/wordcloud');
     } else {
       return { success: false, error: 'Unknown activity type' };
     }
@@ -228,6 +230,7 @@ class RoomManager {
     const activityInstance = new ActivityClass(roomCode, activityConfig, this);
     await activityInstance.onStart();
     room.activity = activityInstance;
+    room.activityType = activityType; // so late joiners learn which mode is live
 
     // Trigger onPlayerJoin for already connected players
     room.participants.forEach(p => {
@@ -239,7 +242,7 @@ class RoomManager {
     if (db) {
       db('rooms')
         .where({ id: room.id })
-        .update({ status: 'active', started_at: new Date() })
+        .update({ status: 'active', activity_type: activityType, started_at: new Date() })
         .catch(err => console.error('DB error starting room activity:', err));
     }
 

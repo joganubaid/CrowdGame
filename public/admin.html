@@ -528,37 +528,65 @@
               <div class="select-wrapper">
                 <select id="activityType">
                   <option value="jigsaw">Collaborative Jigsaw</option>
+                  <option value="wordcloud">Live Audience Word Cloud</option>
                   <option value="trivia" disabled>Live Trivia (coming soon)</option>
-                  <option value="wordcloud" disabled>Word Cloud (coming soon)</option>
                 </select>
               </div>
             </div>
 
-            <div class="grid-2col form-group">
-              <div>
-                <label for="gridRows">Rows</label>
-                <input type="number" id="gridRows" min="2" max="10" value="4">
+            <!-- Jigsaw-specific configuration -->
+            <div id="jigsawConfig">
+              <div class="grid-2col form-group">
+                <div>
+                  <label for="gridRows">Rows</label>
+                  <input type="number" id="gridRows" min="2" max="10" value="4">
+                </div>
+                <div>
+                  <label for="gridCols">Columns</label>
+                  <input type="number" id="gridCols" min="2" max="12" value="6">
+                </div>
               </div>
-              <div>
-                <label for="gridCols">Columns</label>
-                <input type="number" id="gridCols" min="2" max="12" value="6">
+
+              <div class="form-group">
+                <label for="puzzleImageFile">Puzzle image</label>
+                <div class="file-upload-zone" id="dropzone">
+                  <span class="upload-icon">🖼️</span>
+                  <span class="upload-text">Drag &amp; drop, or click to choose</span>
+                  <span class="upload-subtext">PNG or JPEG, up to 10MB</span>
+                  <input type="file" id="puzzleImageFile" accept="image/*" class="hidden">
+                </div>
+                <div id="uploadStatus" class="upload-status hidden">
+                  <div class="spinner"></div> Slicing image into pieces…
+                </div>
+                <div id="imagePreviewContainer" class="image-preview hidden">
+                  <img id="imagePreview" src="" alt="Preview">
+                  <button type="button" id="clearImageBtn" class="btn btn-danger btn-sm">Remove</button>
+                </div>
               </div>
             </div>
 
-            <div class="form-group">
-              <label for="puzzleImageFile">Puzzle image</label>
-              <div class="file-upload-zone" id="dropzone">
-                <span class="upload-icon">🖼️</span>
-                <span class="upload-text">Drag &amp; drop, or click to choose</span>
-                <span class="upload-subtext">PNG or JPEG, up to 10MB</span>
-                <input type="file" id="puzzleImageFile" accept="image/*" class="hidden">
+            <!-- Word Cloud-specific configuration -->
+            <div id="wordcloudConfig" class="hidden">
+              <div class="form-group">
+                <label for="wcPromptInput">Prompt / Question</label>
+                <input type="text" id="wcPromptInput" maxlength="200"
+                       placeholder="e.g. Describe today in one word" value="Describe today in one word">
               </div>
-              <div id="uploadStatus" class="upload-status hidden">
-                <div class="spinner"></div> Slicing image into pieces…
-              </div>
-              <div id="imagePreviewContainer" class="image-preview hidden">
-                <img id="imagePreview" src="" alt="Preview">
-                <button type="button" id="clearImageBtn" class="btn btn-danger btn-sm">Remove</button>
+              <div class="grid-2col form-group">
+                <div>
+                  <label for="wcResponseFormat">Response length</label>
+                  <div class="select-wrapper">
+                    <select id="wcResponseFormat">
+                      <option value="1word">1 word</option>
+                      <option value="phrase" selected>Short phrase</option>
+                      <option value="sentence">Sentence</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label for="wcMaxSubmissions">Submissions / person</label>
+                  <input type="number" id="wcMaxSubmissions" min="1" max="20" value="3">
+                </div>
               </div>
             </div>
 
@@ -604,14 +632,34 @@
               </div>
               <div class="metric-card">
                 <span class="metric-val" id="puzzleProgress">0%</span>
-                <span class="metric-label">Puzzle solved</span>
+                <span class="metric-label" id="progressMetricLabel">Puzzle solved</span>
+              </div>
+            </div>
+
+            <!-- Word Cloud live moderation list (shown only for word cloud) -->
+            <div class="moderation-panel hidden" id="moderationPanel">
+              <h4>Live responses — tap ✕ to hide</h4>
+              <div class="moderation-list" id="moderationList">
+                <span class="moderation-empty">No responses yet.</span>
               </div>
             </div>
 
             <div class="action-buttons-group">
               <button class="btn btn-primary" id="startActivityBtn">Start game</button>
+              <button class="btn btn-cyan hidden" id="closeWordcloudBtn">🏁 Close &amp; Reveal</button>
               <button class="btn btn-danger" id="resetRoomBtn">Reset</button>
             </div>
+
+            <style>
+              .moderation-panel { margin: 16px 0; }
+              .moderation-panel h4 { font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); margin-bottom: 8px; }
+              .moderation-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+              .moderation-empty { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+              .moderation-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px; background: var(--paper-3); border: 2px solid var(--ink); border-radius: 10px; }
+              .moderation-text { font-size: 14px; color: var(--ink); word-break: break-word; }
+              .moderation-remove { flex-shrink: 0; width: 26px; height: 26px; border-radius: 6px; border: 2px solid var(--ink); background: var(--paper-2); color: var(--tangerine); cursor: pointer; font-size: 13px; line-height: 1; }
+              .moderation-remove:active { transform: translate(1px,1px); }
+            </style>
 
             <div class="live-activity-log">
               <h4>Activity log</h4>

@@ -54,10 +54,10 @@ function initSockets(io) {
         });
 
         // If the activity was already started (admin started before screen opened),
-        // push the current full puzzle state to the screen immediately.
+        // push the current full activity state to the screen immediately.
         if (room.activity) {
           socket.emit('activity-start', {
-            type: 'jigsaw',
+            type: room.activityType || 'jigsaw',
             state: room.activity.getStateForScreen()
           });
         }
@@ -99,7 +99,7 @@ function initSockets(io) {
       // If activity is already running, send the starting state immediately to the new player
       if (room.activity) {
         socket.emit('activity-start', {
-          type: 'jigsaw',
+          type: room.activityType || 'jigsaw',
           state: room.activity.getStateForPlayer(socket.playerId)
         });
       }
@@ -111,8 +111,11 @@ function initSockets(io) {
     //   a) carry a valid admin JWT (socket.isAdmin), OR
     //   b) be the registered host socket for that room.
     // This prevents any arbitrary player from starting or restarting the game.
-    socket.on('admin-start-activity', async ({ roomCode, rows, cols, imageUrl }) => {
-      console.log(`Admin requested activity start in room: ${roomCode}`);
+    socket.on('admin-start-activity', async (payload = {}) => {
+      // `activityType` defaults to jigsaw so older clients (which send only
+      // rows/cols/imageUrl) keep working unchanged.
+      const { roomCode, activityType = 'jigsaw' } = payload;
+      console.log(`Admin requested '${activityType}' activity start in room: ${roomCode}`);
 
       const room = roomManager.getRoom(roomCode);
       if (!room) {
@@ -128,13 +131,23 @@ function initSockets(io) {
         return;
       }
 
-      const activityConfig = {
-        rows: parseInt(rows) || 4,
-        cols: parseInt(cols) || 6,
-        imageUrl: imageUrl
-      };
+      // Build the per-activity config from the relevant payload fields.
+      let activityConfig;
+      if (activityType === 'wordcloud') {
+        activityConfig = {
+          prompt: payload.prompt,
+          maxChars: payload.maxChars,
+          maxSubmissions: payload.maxSubmissions
+        };
+      } else {
+        activityConfig = {
+          rows: parseInt(payload.rows) || 4,
+          cols: parseInt(payload.cols) || 6,
+          imageUrl: payload.imageUrl
+        };
+      }
 
-      const result = await roomManager.startActivity(roomCode, 'jigsaw', activityConfig);
+      const result = await roomManager.startActivity(roomCode, activityType, activityConfig);
       if (!result.success) {
         socket.emit('error-message', result.error);
         return;
@@ -142,7 +155,7 @@ function initSockets(io) {
 
       // Notify host and all players that the activity has started
       io.to(room.hostSocketId).emit('activity-start', {
-        type: 'jigsaw',
+        type: activityType,
         state: room.activity.getStateForScreen()
       });
 
@@ -150,7 +163,7 @@ function initSockets(io) {
       room.participants.forEach((p) => {
         if (p.isConnected && p.socketId) {
           io.to(p.socketId).emit('activity-start', {
-            type: 'jigsaw',
+            type: activityType,
             state: room.activity.getStateForPlayer(p.id)
           });
         }
@@ -234,7 +247,87 @@ function initSockets(io) {
       }
     });
 
-    // 5. Clean up on socket disconnect
+    // 5. Word Cloud: participant submits a text response
+    socket.on('submit-response', (actionData) => {
+      if (socket.role !== 'player' || !socket.roomCode) return;
+
+      const room = roomManager.getRoom(socket.roomCode);
+      if (!room || !room.activity || room.status !== 'active') return;
+
+      const player = room.participants.get(socket.playerId);
+      if (!player) return;
+
+      const result = room.activity.onPlayerAction(player, 'submit-response', actionData);
+      if (!result || !result.success) {
+        socket.emit('error-message', result ? result.error : 'Submission failed.');
+        return;
+      }
+
+      // Acknowledge to the submitter (drives the "submitted / remaining" UI).
+      socket.emit('response-accepted', {
+        hidden: result.hidden,
+        remaining: result.remaining
+      });
+
+      // Push the refreshed cloud to the room. The big screen renders it and the
+      // admin console uses it to moderate; players don't listen for this event.
+      io.to(room.roomCode).emit('wordcloud-update', result.screenState);
+    });
+
+    // 6. Word Cloud: host/admin removes a response (moderation)
+    socket.on('admin-remove-response', ({ roomCode, responseId } = {}) => {
+      const room = roomManager.getRoom(roomCode);
+      if (!room || !room.activity) return;
+
+      const isRoomHost = socket.id === room.hostSocketId;
+      if (!socket.isAdmin && !isRoomHost) {
+        socket.emit('error-message', 'Unauthorized: only the room host or admin can remove responses.');
+        return;
+      }
+      if (typeof room.activity.removeResponse !== 'function') return;
+
+      const result = room.activity.removeResponse(responseId);
+      if (result.success) {
+        io.to(room.roomCode).emit('wordcloud-update', result.screenState);
+      }
+    });
+
+    // 7. Word Cloud: participant upvotes a word
+    socket.on('vote-word', (actionData) => {
+      if (socket.role !== 'player' || !socket.roomCode) return;
+
+      const room = roomManager.getRoom(socket.roomCode);
+      if (!room || !room.activity || room.status !== 'active') return;
+
+      const player = room.participants.get(socket.playerId);
+      if (!player) return;
+
+      const result = room.activity.onPlayerAction(player, 'vote-word', actionData);
+      if (!result || !result.success) {
+        socket.emit('error-message', result ? result.error : 'Vote failed.');
+        return;
+      }
+      io.to(room.roomCode).emit('wordcloud-update', result.screenState);
+    });
+
+    // 8. Word Cloud: host/admin closes the session and reveals the summary
+    socket.on('admin-close-activity', ({ roomCode } = {}) => {
+      const room = roomManager.getRoom(roomCode);
+      if (!room || !room.activity) return;
+
+      const isRoomHost = socket.id === room.hostSocketId;
+      if (!socket.isAdmin && !isRoomHost) {
+        socket.emit('error-message', 'Unauthorized: only the room host or admin can close the session.');
+        return;
+      }
+      if (typeof room.activity.close !== 'function') return;
+
+      const summary = room.activity.close();
+      room.status = 'completed';
+      io.to(room.roomCode).emit('wordcloud-closed', summary);
+    });
+
+    // 9. Clean up on socket disconnect
     socket.on('disconnect', () => {
       roomManager.handleDisconnect(socket.id);
     });

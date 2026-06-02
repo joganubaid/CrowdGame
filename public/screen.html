@@ -494,5 +494,74 @@
       </div>
     </div>
   </div>
+
+  <!-- WORD CLOUD SCREEN -->
+  <div id="wordcloudScreen" class="screen-panel hidden">
+    <div class="game-hud">
+      <div class="hud-item"><span class="hud-label">Activity</span><span class="hud-value">Live Word Cloud</span></div>
+      <div class="hud-item"><span class="hud-label">Responses</span><span class="hud-value" id="wcResponseCount">0</span></div>
+      <div class="hud-item"><span class="hud-label">People</span><span class="hud-value" id="wcParticipantCount">0</span></div>
+      <div class="hud-item"><span class="hud-label">Room</span><span class="hud-value" id="wcRoomCode">----</span></div>
+      <button class="btn wc-hud-btn" id="wcModeBtn" type="button">Mode: Classic</button>
+      <button class="btn wc-hud-btn" id="wcExportBtn" type="button">Export CSV</button>
+    </div>
+    <h2 class="wc-prompt" id="wcScreenPrompt">&nbsp;</h2>
+    <div class="wc-sentiment-bar hidden" id="wcSentimentBar">
+      <div class="wc-seg wc-seg-pos" id="wcSegPos"><span></span></div>
+      <div class="wc-seg wc-seg-neu" id="wcSegNeu"><span></span></div>
+      <div class="wc-seg wc-seg-neg" id="wcSegNeg"><span></span></div>
+    </div>
+    <div class="wc-cloud-wrap">
+      <div class="wc-cloud" id="wcCloud"><div class="wc-empty" id="wcEmpty">Waiting for the first response…</div></div>
+    </div>
+    <div class="wc-join-hint">
+      <div id="wcQr" class="wc-qr"></div>
+      <div class="wc-join-text"><span class="wc-join-label">Scan to join &amp; add your voice</span><code id="wcJoinUrl">—</code></div>
+    </div>
+    <div class="activity-ticker" id="wcTicker">Waiting for voices…</div>
+  </div>
+
+  <!-- WORD CLOUD SUMMARY / REVEAL -->
+  <div id="wordcloudSummaryScreen" class="screen-panel hidden">
+    <div class="completion-banner">
+      <h1 class="bounce-in">The room has spoken</h1>
+      <p class="sub-banner" id="wcSummaryPrompt"></p>
+    </div>
+    <div class="completion-content">
+      <div class="leaderboard-card">
+        <h2>🏆 Top words</h2>
+        <div class="leaderboard-list" id="wcSummaryList"></div>
+      </div>
+      <div class="stats-summary-card">
+        <h2>Recap</h2>
+        <div class="stat-row"><span>Total responses</span><span class="val" id="wcSummaryResponses">0</span></div>
+        <div class="stat-row"><span>Unique participants</span><span class="val" id="wcSummaryPeople">0</span></div>
+        <div class="stat-row"><span>Total upvotes</span><span class="val" id="wcSummaryVotes">0</span></div>
+        <button class="btn" id="wcSummaryExportBtn" type="button">Export CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    #wordcloudScreen.active { display: flex; flex-direction: column; }
+    .wc-prompt { text-align:center; font-family: var(--display); font-weight:700; font-size: clamp(24px,3vw,40px); color: var(--ink); margin: 14px 24px 8px; }
+    .wc-cloud-wrap { flex:1; display:flex; align-items:center; justify-content:center; padding: 10px 50px; overflow:hidden; }
+    .wc-cloud { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap: 6px 26px; max-width: 1500px; }
+    .wc-word { font-family: var(--display); font-weight:800; line-height:1; transition: font-size .4s ease, transform .2s ease; animation: wcPop .35s ease; }
+    .wc-word:hover { transform: scale(1.06); }
+    @keyframes wcPop { from { transform: scale(.5); opacity:0; } to { transform: scale(1); opacity:1; } }
+    .wc-empty { font-family: var(--mono); color: var(--ink-soft); font-size: 20px; }
+    .wc-vote-badge { font-size: .42em; margin-left: 4px; color: var(--ink-soft); vertical-align: super; }
+    .wc-hud-btn { font-size: 13px; padding: 8px 14px; }
+    .wc-sentiment-bar { display:flex; width:78%; max-width:1000px; margin: 0 auto 6px; height: 24px; border:2.5px solid var(--ink); border-radius: 999px; overflow:hidden; }
+    .wc-sentiment-bar.hidden { display:none; }
+    .wc-seg { display:flex; align-items:center; justify-content:center; font-family: var(--mono); font-size:11px; font-weight:700; color:#1B1714; transition: width .5s ease; min-width:0; }
+    .wc-seg-pos { background: var(--leaf); } .wc-seg-neu { background: var(--sky); } .wc-seg-neg { background: var(--tangerine); }
+    .wc-join-hint { position:absolute; bottom: 60px; right: 26px; display:flex; align-items:center; gap:12px; background: var(--paper-2); border:2.5px solid var(--ink); border-radius:14px; padding:10px 14px; box-shadow: 3px 3px 0 var(--ink); }
+    .wc-qr img { width:74px; height:74px; display:block; border-radius:6px; }
+    .wc-join-text { display:flex; flex-direction:column; gap:3px; }
+    .wc-join-label { font-family: var(--mono); font-size:11px; color: var(--ink-soft); }
+    .wc-join-text code { font-family: var(--mono); font-size:12px; color: var(--tangerine); }
+  </style>
 </body>
 </html>

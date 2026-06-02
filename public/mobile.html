@@ -635,6 +635,62 @@
     </div>
   </div>
 
+  <!-- 5. WORD CLOUD SUBMISSION SCREEN -->
+  <div id="wordcloudSection" class="mobile-card hidden">
+    <div class="card-header">
+      <div class="pilot-badge">LIVE WORD CLOUD</div>
+      <h2 class="neon-cyan">Your voice</h2>
+    </div>
+    <div class="card-body">
+      <p class="desc" id="wcPrompt">Loading prompt…</p>
+      <form id="wordcloudForm">
+        <div class="form-group">
+          <label for="wcInput">Your response</label>
+          <input type="text" id="wcInput" placeholder="Type a word or short phrase" autocomplete="off" required>
+          <div class="wc-meta">
+            <span id="wcCharCount">0 / 80</span>
+            <span id="wcRemaining"></span>
+          </div>
+        </div>
+        <button type="submit" id="wcSubmitBtn" class="btn btn-primary btn-block">Send to Screen</button>
+      </form>
+      <div id="wcConfirm" class="joined-indicator hidden">
+        <div class="ping-circle"></div>
+        <span id="wcConfirmText">Response sent! It's on the big screen.</span>
+      </div>
+      <div id="wcDone" class="hidden">
+        <p class="desc text-center">You've used all your submissions. Thanks for contributing!</p>
+      </div>
+      <div id="wcVoteArea" class="wc-vote-area hidden">
+        <p class="wc-vote-title">👍 Tap a word to upvote it</p>
+        <div id="wcVoteChips" class="wc-vote-chips"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. WORD CLOUD CLOSED SCREEN -->
+  <div id="wordcloudClosedSection" class="mobile-card hidden">
+    <div class="card-header">
+      <h1 class="neon-green">Session closed</h1>
+      <p class="tagline">Thanks for your voice</p>
+    </div>
+    <div class="card-body">
+      <p class="desc text-center">The host has closed this word cloud. Check the big screen for the final results!</p>
+      <button class="btn btn-secondary btn-block" onclick="window.location.reload()">Reset</button>
+    </div>
+  </div>
+
+  <style>
+    .wc-meta { display:flex; justify-content:space-between; margin-top:6px; font-family: var(--mono); font-size:12px; color: var(--ink-soft); }
+    .wc-vote-area { margin-top:18px; }
+    .wc-vote-title { font-size:13px; color: var(--ink-soft); margin-bottom:8px; text-align:center; }
+    .wc-vote-chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+    .wc-chip { display:inline-flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px; border:2.5px solid var(--ink); background: var(--paper-3); color: var(--ink); font-family: var(--body); font-size:14px; cursor:pointer; box-shadow: var(--shadow-sm); }
+    .wc-chip:active { transform: translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
+    .wc-chip .wc-chip-votes { font-family: var(--mono); font-size:11px; color: var(--leaf); }
+    .wc-chip.voted { background: color-mix(in srgb, var(--leaf) 22%, var(--paper-2)); opacity:0.8; cursor:default; }
+  </style>
+
   <div id="sysOverlay" class="sys-overlay hidden">
     <div class="sys-overlay-card">
       <h3 id="sysOverlayTitle">Heads up</h3>

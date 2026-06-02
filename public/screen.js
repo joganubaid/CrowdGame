@@ -2,7 +2,8 @@
 const SCREEN_STATE = {
   LOBBY: 'lobby',
   PLAYING: 'playing',
-  COMPLETE: 'complete'
+  COMPLETE: 'complete',
+  WORDCLOUD: 'wordcloud'
 };
 
 let currentState = SCREEN_STATE.LOBBY;
@@ -200,12 +201,19 @@ function setupConnection() {
     document.getElementById('playerCount').textContent = data.participantsCount;
   });
 
-  // Event: Puzzle starts!
+  // Event: Activity starts!
   socket.on('activity-start', (data) => {
     if (data.type === 'jigsaw') {
       startJigsawPuzzle(data.state);
+    } else if (data.type === 'wordcloud') {
+      startWordCloud(data.state);
     }
   });
+
+  // Word cloud refreshed (submission, vote, or moderation)
+  socket.on('wordcloud-update', (state) => { renderWordCloud(state); });
+  // Host closed the word cloud — reveal the summary
+  socket.on('wordcloud-closed', (summary) => { showWordCloudSummary(summary); });
 
   // Event: Piece dragged/moved by player
   socket.on('piece-move', (data) => {
@@ -489,6 +497,172 @@ function triggerPuzzleCompletion({ leaderboard, totalPieces }) {
   }, 400);
 }
 
+// ---- WORD CLOUD SCREEN ----
+let wcLatestState = null;
+let wcLastResponseId = null;
+let wcColorMode = 'classic'; // 'classic' | 'sentiment'
+const WC_PALETTE = ['#FF5A2C', '#6C4CE0', '#1B9E57', '#2E73E8', '#FFB100'];
+const WC_SENTIMENT_COLORS = { positive: '#1B9E57', negative: '#FF5A2C', neutral: '#2E73E8' };
+
+function startWordCloud(state) {
+  currentState = SCREEN_STATE.WORDCLOUD;
+  document.getElementById('lobbyScreen').classList.remove('active');
+  document.getElementById('lobbyScreen').classList.add('hidden');
+  const panel = document.getElementById('wordcloudScreen');
+  panel.classList.remove('hidden');
+  panel.classList.add('active');
+
+  document.getElementById('wcRoomCode').textContent = roomCode;
+  document.getElementById('wcScreenPrompt').textContent = state.prompt || '';
+  const lobbyQr = document.getElementById('qrcode');
+  if (lobbyQr) document.getElementById('wcQr').innerHTML = lobbyQr.innerHTML;
+  document.getElementById('wcJoinUrl').textContent = document.getElementById('joinUrlVal').textContent;
+  renderWordCloud(state);
+}
+
+function renderWordCloud(state) {
+  wcLatestState = state;
+  animateCount(document.getElementById('wcResponseCount'), state.totalResponses || 0);
+  animateCount(document.getElementById('wcParticipantCount'), state.uniqueParticipants || 0);
+  if (state.prompt) document.getElementById('wcScreenPrompt').textContent = state.prompt;
+
+  const cloud = document.getElementById('wcCloud');
+  const empty = document.getElementById('wcEmpty');
+  const words = state.cloud || [];
+  if (words.length === 0) {
+    cloud.innerHTML = '';
+    cloud.appendChild(empty);
+    empty.style.display = '';
+    updateSentimentBar([]);
+    return;
+  }
+  empty.style.display = 'none';
+
+  const maxW = words[0].weight, minW = words[words.length - 1].weight;
+  const MIN_PX = 22, MAX_PX = 96;
+  cloud.innerHTML = '';
+  words.forEach((entry, i) => {
+    const ratio = maxW === minW ? 1 : (entry.weight - minW) / (maxW - minW);
+    const size = Math.round(MIN_PX + ratio * (MAX_PX - MIN_PX));
+    const color = wcColorMode === 'sentiment'
+      ? (WC_SENTIMENT_COLORS[entry.sentiment] || WC_SENTIMENT_COLORS.neutral)
+      : WC_PALETTE[i % WC_PALETTE.length];
+    const span = document.createElement('span');
+    span.className = 'wc-word';
+    span.style.fontSize = `${size}px`;
+    span.style.color = color;
+    span.title = `${entry.count}x | ${entry.votes} upvotes | ${entry.sentiment}`;
+    span.append(entry.word);
+    if (entry.votes > 0) {
+      const badge = document.createElement('sup');
+      badge.className = 'wc-vote-badge';
+      badge.textContent = `▲${entry.votes}`;
+      span.appendChild(badge);
+    }
+    cloud.appendChild(span);
+  });
+  updateSentimentBar(words);
+
+  const responses = state.responses || [];
+  const latest = responses[responses.length - 1];
+  if (latest && latest.id !== wcLastResponseId) {
+    wcLastResponseId = latest.id;
+    const ticker = document.getElementById('wcTicker');
+    ticker.textContent = `${latest.displayName}: "${latest.text}"`;
+    ticker.classList.add('pulse');
+    setTimeout(() => ticker.classList.remove('pulse'), 400);
+  }
+}
+
+function animateCount(el, target) {
+  if (!el) return;
+  const from = parseInt(el.textContent, 10) || 0;
+  if (from === target) { el.textContent = target; return; }
+  const steps = 12; let i = 0;
+  clearInterval(el._countTimer);
+  el._countTimer = setInterval(() => {
+    i++;
+    el.textContent = Math.round(from + (target - from) * (i / steps));
+    if (i >= steps) { el.textContent = target; clearInterval(el._countTimer); }
+  }, 25);
+}
+
+function toggleWordCloudMode() {
+  wcColorMode = wcColorMode === 'classic' ? 'sentiment' : 'classic';
+  document.getElementById('wcModeBtn').textContent = `Mode: ${wcColorMode === 'sentiment' ? 'Sentiment' : 'Classic'}`;
+  document.getElementById('wcSentimentBar').classList.toggle('hidden', wcColorMode !== 'sentiment');
+  if (wcLatestState) renderWordCloud(wcLatestState);
+}
+
+function updateSentimentBar(words) {
+  if (wcColorMode !== 'sentiment') return;
+  const totals = { positive: 0, neutral: 0, negative: 0 };
+  words.forEach(w => { totals[w.sentiment] = (totals[w.sentiment] || 0) + w.weight; });
+  const sum = totals.positive + totals.neutral + totals.negative || 1;
+  const set = (id, val) => {
+    const seg = document.getElementById(id);
+    const pct = Math.round((val / sum) * 100);
+    seg.style.width = `${pct}%`;
+    seg.querySelector('span').textContent = pct >= 8 ? `${pct}%` : '';
+  };
+  set('wcSegPos', totals.positive);
+  set('wcSegNeu', totals.neutral);
+  set('wcSegNeg', totals.negative);
+}
+
+function showWordCloudSummary(summary) {
+  currentState = SCREEN_STATE.COMPLETE;
+  Sound.playComplete();
+  const panel = document.getElementById('wordcloudScreen');
+  panel.classList.remove('active');
+  panel.classList.add('hidden');
+  const sum = document.getElementById('wordcloudSummaryScreen');
+  sum.classList.remove('hidden');
+  sum.classList.add('active');
+
+  document.getElementById('wcSummaryPrompt').textContent = summary.prompt || '';
+  document.getElementById('wcSummaryResponses').textContent = summary.totalResponses || 0;
+  document.getElementById('wcSummaryPeople').textContent = summary.uniqueParticipants || 0;
+  document.getElementById('wcSummaryVotes').textContent = summary.totalVotes || 0;
+
+  const list = document.getElementById('wcSummaryList');
+  list.innerHTML = '';
+  (summary.topWords || []).forEach((entry, index) => {
+    const item = document.createElement('div');
+    item.className = `leaderboard-item ${index === 0 ? 'first-place' : ''}`;
+    const rank = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+    const votes = entry.votes > 0 ? ` · ▲${entry.votes}` : '';
+    item.innerHTML = `<div class="rank-name"><span class="rank">${rank}</span><span class="name">${entry.word}</span></div><div class="score">${entry.count}x${votes}</div>`;
+    list.appendChild(item);
+  });
+
+  if (confettiInterval !== null) clearInterval(confettiInterval);
+  confettiInterval = setInterval(() => {
+    if (currentState === SCREEN_STATE.COMPLETE) {
+      const rx = Math.random() * puzzleCanvas.width;
+      const ry = Math.random() * puzzleCanvas.height * 0.4;
+      spawnSparks(rx, ry, '#1B9E57', 8);
+      spawnSparks(rx, ry, '#2E73E8', 8);
+    }
+  }, 400);
+}
+
+function exportWordCloudCsv() {
+  if (!wcLatestState) return;
+  const rows = [['response', 'name', 'submitted_at']];
+  (wcLatestState.responses || []).forEach(r => rows.push([r.text, r.displayName, r.createdAt]));
+  const csv = rows.map(cols => cols.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `wordcloud-${roomCode}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 // Main Frame tick
 function gameLoop() {
   updateStars();
@@ -520,6 +694,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('resize', handleResize);
   handleResize();
+
+  const exportBtn = document.getElementById('wcExportBtn');
+  if (exportBtn) exportBtn.addEventListener('click', exportWordCloudCsv);
+  const summaryExportBtn = document.getElementById('wcSummaryExportBtn');
+  if (summaryExportBtn) summaryExportBtn.addEventListener('click', exportWordCloudCsv);
+  const modeBtn = document.getElementById('wcModeBtn');
+  if (modeBtn) modeBtn.addEventListener('click', toggleWordCloudMode);
 
   setupConnection();
 

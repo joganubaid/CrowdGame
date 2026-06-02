@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let piecesPlacedCount = 0;
   let currentAssignedPieces = [];
   let selectedPieceIndex = 0;
+  let currentActivityType = null; // 'jigsaw' | 'wordcloud'
 
   // Workspace configuration
   const CANVAS_WIDTH = 1200;
@@ -84,17 +85,27 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('room-update', (data) => {
-      if (data.status === 'active') {
+      // Only the jigsaw board is driven by room-update; the word cloud manages
+      // its own screen via activity-start (room-update is broadcast room-wide).
+      if (data.status === 'active' && currentActivityType !== 'wordcloud') {
         waitingSection.classList.add('hidden');
         gameplaySection.classList.remove('hidden');
       }
     });
 
     socket.on('activity-start', (data) => {
+      currentActivityType = data.type;
+
+      // Word Cloud mode uses its own submission screen; jigsaw uses the board.
+      if (data.type === 'wordcloud') {
+        startWordCloud(data.state);
+        return;
+      }
+
       waitingSection.classList.add('hidden');
       completeSection.classList.add('hidden');
       gameplaySection.classList.remove('hidden');
-      
+
       // Initialise header details
       headerPilotName.textContent = myDisplayName.toUpperCase();
       headerColorDot.style.backgroundColor = myColor;
@@ -159,6 +170,19 @@ document.addEventListener('DOMContentLoaded', () => {
       gameplaySection.classList.add('hidden');
       completeSection.classList.remove('hidden');
       myContributionsVal.textContent = piecesPlacedCount;
+    });
+
+    socket.on('response-accepted', (data) => {
+      onResponseAccepted(data);
+    });
+
+    socket.on('wordcloud-update', (state) => {
+      if (currentActivityType === 'wordcloud') renderVoteChips(state.cloud || []);
+    });
+
+    socket.on('wordcloud-closed', () => {
+      wordcloudSection.classList.add('hidden');
+      document.getElementById('wordcloudClosedSection').classList.remove('hidden');
     });
 
     socket.on('host-disconnected', () => {
@@ -370,6 +394,99 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 4. HAPTICS (Device Vibration)
+  // ---- WORD CLOUD SUBMISSION + VOTING ----
+  const wordcloudSection = document.getElementById('wordcloudSection');
+  const wordcloudForm = document.getElementById('wordcloudForm');
+  const wcInput = document.getElementById('wcInput');
+  const wcPrompt = document.getElementById('wcPrompt');
+  const wcCharCount = document.getElementById('wcCharCount');
+  const wcRemaining = document.getElementById('wcRemaining');
+  const wcSubmitBtn = document.getElementById('wcSubmitBtn');
+  const wcConfirm = document.getElementById('wcConfirm');
+  const wcConfirmText = document.getElementById('wcConfirmText');
+  const wcDone = document.getElementById('wcDone');
+  const wcVoteArea = document.getElementById('wcVoteArea');
+  const wcVoteChips = document.getElementById('wcVoteChips');
+  const wcVotedWords = new Set();
+
+  let wcMaxChars = 80;
+  let wcRemainingCount = 3;
+
+  function startWordCloud(state) {
+    joinSection.classList.add('hidden');
+    waitingSection.classList.add('hidden');
+    gameplaySection.classList.add('hidden');
+    completeSection.classList.add('hidden');
+    wordcloudSection.classList.remove('hidden');
+
+    wcMaxChars = state.maxChars || 80;
+    wcRemainingCount = (state.remaining != null) ? state.remaining : (state.maxSubmissions || 3);
+    wcPrompt.textContent = state.prompt || '';
+    wcInput.maxLength = wcMaxChars;
+    updateCharCount();
+    updateRemaining();
+    if (wcRemainingCount <= 0) showAllSubmitted();
+  }
+
+  function updateCharCount() { wcCharCount.textContent = `${wcInput.value.length} / ${wcMaxChars}`; }
+  function updateRemaining() { wcRemaining.textContent = `${wcRemainingCount} left`; }
+  function showAllSubmitted() {
+    wordcloudForm.classList.add('hidden');
+    wcConfirm.classList.add('hidden');
+    wcDone.classList.remove('hidden');
+  }
+
+  function onResponseAccepted(data) {
+    wcRemainingCount = data.remaining;
+    updateRemaining();
+    wcSubmitBtn.disabled = false;
+    wcSubmitBtn.textContent = 'Send to Screen';
+    wcInput.value = '';
+    updateCharCount();
+    wcConfirmText.textContent = data.hidden
+      ? 'Received — hidden by the profanity filter.'
+      : "Response sent! It's on the big screen.";
+    wcConfirm.classList.remove('hidden');
+    if (wcRemainingCount <= 0) setTimeout(showAllSubmitted, 1200);
+  }
+
+  // Render the top words as tappable upvote chips.
+  function renderVoteChips(cloud) {
+    const top = cloud.slice(0, 12);
+    if (top.length === 0) { wcVoteArea.classList.add('hidden'); return; }
+    wcVoteArea.classList.remove('hidden');
+    wcVoteChips.innerHTML = '';
+    top.forEach((entry) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'wc-chip';
+      const voted = wcVotedWords.has(entry.word);
+      if (voted) chip.classList.add('voted');
+      chip.disabled = voted;
+      chip.innerHTML = `<span>${entry.word}</span><span class="wc-chip-votes">▲${entry.votes}</span>`;
+      chip.addEventListener('click', () => {
+        if (wcVotedWords.has(entry.word) || !socket) return;
+        wcVotedWords.add(entry.word);
+        chip.classList.add('voted');
+        chip.disabled = true;
+        socket.emit('vote-word', { word: entry.word });
+      });
+      wcVoteChips.appendChild(chip);
+    });
+  }
+
+  if (wcInput) wcInput.addEventListener('input', updateCharCount);
+  if (wordcloudForm) {
+    wordcloudForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = wcInput.value.trim();
+      if (!text || !socket) return;
+      wcSubmitBtn.disabled = true;
+      wcSubmitBtn.textContent = 'Sending…';
+      socket.emit('submit-response', { text });
+    });
+  }
+
   function triggerHapticFeedback(success) {
     if ('vibrate' in navigator) {
       if (success) {
