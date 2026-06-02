@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Local database (auto-generated on first run)
+*.sqlite
+
+# Environment / secrets
+.env
+.env.local
+
+# Uploaded puzzle images (keep the committed default only)
+public/uploads/*
+!public/uploads/default-puzzle.png
+
+# Logs & OS cruft
+*.log
+.DS_Store

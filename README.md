@@ -204,7 +204,7 @@ In **production** (`NODE_ENV=production`):
 - A health-check endpoint is available at `/health` returning HTTP 200 (required for target groups).
 
 ### AWS ECS Fargate Deployment
-A complete CloudFormation template is provided under [cloudformation.yaml](file:///Users/sachin/Documents/GitHub/Mobile_Game/infrastructure/aws/cloudformation.yaml) to provision:
+A complete CloudFormation template is provided under [cloudformation.yaml](infrastructure/aws/cloudformation.yaml) to provision:
 1. An **ECS Cluster** running tasks on Fargate.
 2. An **Application Load Balancer** with listener rules routing HTTPS traffic to HTTP container instances.
 3. Integration support for an RDS PostgreSQL database instance and AWS ElastiCache Redis.
