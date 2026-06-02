@@ -127,25 +127,30 @@ function updateStars() {
 }
 
 function drawBackground() {
-  bgCtx.fillStyle = '#060313';
+  // Theme-aware backdrop
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  bgCtx.fillStyle = dark ? '#14110E' : '#F1EADA';
   bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-  
-  // Dynamic retro horizon glow in lobby state
+
+  // Soft tangerine glow rising from the bottom in the lobby
   if (currentState === SCREEN_STATE.LOBBY) {
     const glowGrad = bgCtx.createRadialGradient(
-      bgCanvas.width / 2, bgCanvas.height * 0.8, 50,
-      bgCanvas.width / 2, bgCanvas.height * 0.8, bgCanvas.width * 0.6
+      bgCanvas.width / 2, bgCanvas.height * 0.85, 50,
+      bgCanvas.width / 2, bgCanvas.height * 0.85, bgCanvas.width * 0.6
     );
-    glowGrad.addColorStop(0, 'rgba(255, 0, 127, 0.12)');
-    glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    glowGrad.addColorStop(0, 'rgba(255, 90, 44, 0.16)');
+    glowGrad.addColorStop(1, 'rgba(255, 90, 44, 0)');
     bgCtx.fillStyle = glowGrad;
     bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
   }
 
-  bgCtx.fillStyle = '#ffffff';
+  // Drifting confetti dots
+  bgCtx.fillStyle = dark ? '#F2EADB' : '#1B1714';
   stars.forEach(s => {
-    bgCtx.globalAlpha = s.speed * 1.5;
-    bgCtx.fillRect(s.x, s.y, s.size, s.size);
+    bgCtx.globalAlpha = s.speed * (dark ? 0.4 : 0.45);
+    bgCtx.beginPath();
+    bgCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    bgCtx.fill();
   });
   bgCtx.globalAlpha = 1.0;
 }
@@ -227,8 +232,8 @@ function setupConnection() {
 
     // Play snapping audio and show visual toast
     Sound.playSnap();
-    spawnSparks(correctX + (puzzleData.pieceWidth / 2), correctY + (puzzleData.pieceHeight / 2), '#ff007f');
-    spawnSparks(correctX + (puzzleData.pieceWidth / 2), correctY + (puzzleData.pieceHeight / 2), '#00f3ff');
+    spawnSparks(correctX + (puzzleData.pieceWidth / 2), correctY + (puzzleData.pieceHeight / 2), '#FF5A2C');
+    spawnSparks(correctX + (puzzleData.pieceWidth / 2), correctY + (puzzleData.pieceHeight / 2), '#6C4CE0');
     
     // Ticker announcement
     const ticker = document.getElementById('activityTicker');
@@ -257,8 +262,6 @@ function addPlayerToLobbyGrid(player) {
   div.id = `p-${player.id}`;
   div.className = 'player-avatar';
   div.style.borderColor = player.color;
-  div.style.textShadow = `0 0 5px ${player.color}`;
-  div.style.boxShadow = `0 0 8px ${player.color}22`;
   div.textContent = player.displayName.toUpperCase();
   grid.appendChild(div);
 
@@ -351,13 +354,14 @@ function drawJigsaw() {
   // 1. Draw faded background guidelines image (Ghost)
   if (puzzleImage.complete) {
     puzzleCtx.save();
-    puzzleCtx.globalAlpha = 0.08;
+    puzzleCtx.globalAlpha = 0.13;
     puzzleCtx.drawImage(puzzleImage, 0, 0, puzzleCanvas.width, puzzleCanvas.height);
     puzzleCtx.restore();
   }
 
-  // 2. Draw Grid Lines
-  puzzleCtx.strokeStyle = 'rgba(0, 243, 255, 0.15)';
+  // 2. Draw Grid Lines (theme-aware so they read on dark boards too)
+  const darkBoard = document.documentElement.getAttribute('data-theme') === 'dark';
+  puzzleCtx.strokeStyle = darkBoard ? 'rgba(242, 234, 219, 0.18)' : 'rgba(27, 23, 20, 0.16)';
   puzzleCtx.lineWidth = 1;
   for (let r = 0; r <= puzzleData.rows; r++) {
     const y = r * puzzleData.pieceHeight;
@@ -391,11 +395,10 @@ function drawJigsaw() {
   puzzleData.pieces.forEach(p => {
     if (!p.isPlaced && p.imgElement) {
       puzzleCtx.save();
-      // Draw neon placeholder box glow
-      puzzleCtx.shadowBlur = 15;
-      puzzleCtx.shadowColor = '#00f3ff';
-      puzzleCtx.strokeStyle = 'rgba(0, 243, 255, 0.6)';
-      puzzleCtx.lineWidth = 2;
+      // Draw a crisp tangerine frame around floating (unplaced) pieces
+      puzzleCtx.shadowBlur = 0;
+      puzzleCtx.strokeStyle = 'rgba(255, 90, 44, 0.95)';
+      puzzleCtx.lineWidth = 3;
       // Use puzzleData.pieceHeight (p.pieceHeight is not in the screen state payload)
       puzzleCtx.strokeRect(p.currentX, p.currentY, puzzleData.pieceWidth, puzzleData.pieceHeight);
 
@@ -466,7 +469,8 @@ function triggerPuzzleCompletion({ leaderboard, totalPieces }) {
     item.innerHTML = `
       <div class="rank-name">
         <span class="rank">${rankPrefix}</span>
-        <span class="name" style="color: ${player.color}">${player.displayName.toUpperCase()}</span>
+        <span class="pdot" style="background: ${player.color}"></span>
+        <span class="name">${player.displayName.toUpperCase()}</span>
       </div>
       <div class="score">${player.score} PTS</div>
     `;
@@ -479,8 +483,8 @@ function triggerPuzzleCompletion({ leaderboard, totalPieces }) {
     if (currentState === SCREEN_STATE.COMPLETE) {
       const rx = Math.random() * puzzleCanvas.width;
       const ry = Math.random() * puzzleCanvas.height * 0.4;
-      spawnSparks(rx, ry, '#39ff14', 8);
-      spawnSparks(rx, ry, '#00f3ff', 8);
+      spawnSparks(rx, ry, '#FFB100', 8);
+      spawnSparks(rx, ry, '#FF5A2C', 8);
     }
   }, 400);
 }

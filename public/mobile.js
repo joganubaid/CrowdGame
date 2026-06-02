@@ -41,6 +41,17 @@ document.addEventListener('DOMContentLoaded', () => {
   roomCode = pathParts[pathParts.length - 1].toUpperCase();
   joinRoomCode.textContent = roomCode;
 
+  // Peek: press and hold to reveal the full picture behind the grid
+  const peekBtn = document.getElementById('peekBtn');
+  if (peekBtn) {
+    const startPeek = (e) => { e.preventDefault(); dragBoard.classList.add('peeking'); peekBtn.classList.add('held'); };
+    const endPeek = () => { dragBoard.classList.remove('peeking'); peekBtn.classList.remove('held'); };
+    peekBtn.addEventListener('pointerdown', startPeek);
+    peekBtn.addEventListener('pointerup', endPeek);
+    peekBtn.addEventListener('pointerleave', endPeek);
+    peekBtn.addEventListener('pointercancel', endPeek);
+  }
+
   // 1. JOIN FORM FORM SUBMISSION
   joinForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -98,6 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dragBoard.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url(${data.state.imageUrl})`;
         dragBoard.style.backgroundSize = '100% 100%';
         dragBoard.style.backgroundPosition = 'center';
+        const peekLayer = document.getElementById('peekLayer');
+        if (peekLayer) peekLayer.src = data.state.imageUrl;
       }
 
       // Configure grid overlay to match server rows/cols
@@ -149,13 +162,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('host-disconnected', () => {
-      alert('Event Big Screen disconnected. Returning to entry screen.');
-      window.location.reload();
+      if (window.crowdOverlay) {
+        window.crowdOverlay('Screen disconnected', 'The big screen went offline. Tap below to rejoin the game.', 'Back to start', function(){ window.location.reload(); });
+      } else { alert('Event Big Screen disconnected. Returning to entry screen.'); window.location.reload(); }
     });
 
     socket.on('error-message', (msg) => {
-      alert(msg);
-      window.location.reload();
+      if (window.crowdOverlay) {
+        window.crowdOverlay('Something went wrong', msg, 'Back to start', function(){ window.location.reload(); });
+      } else { alert(msg); window.location.reload(); }
     });
   }
 
@@ -288,6 +303,15 @@ document.addEventListener('DOMContentLoaded', () => {
         currentX: canvasX,
         currentY: canvasY
       });
+
+      // Highlight the grid cell the piece is currently hovering over
+      const go = document.getElementById('gridOverlay');
+      if (go && go.children.length) {
+        const idx = targetRow * puzzleCols + targetCol;
+        for (let i = 0; i < go.children.length; i++) {
+          go.children[i].classList.toggle('cell-hot', i === idx);
+        }
+      }
     }
 
     function dragEnd(e) {
@@ -323,6 +347,10 @@ document.addEventListener('DOMContentLoaded', () => {
       xOffset = 0;
       yOffset = 0;
       element.style.transform = `translate(-50%, -50%)`;
+
+      // Clear the cell highlight
+      const go = document.getElementById('gridOverlay');
+      if (go) { for (let i = 0; i < go.children.length; i++) go.children[i].classList.remove('cell-hot'); }
     }
   }
 

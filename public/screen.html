@@ -3,48 +3,429 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CrowdPlay | Event Big Screen Display</title>
+  <title>CrowdPlay — Big Screen</title>
+  <script>
+    (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('crowdplay-theme') || 'light'); } catch(e){} })();
+    function cpToggleTheme(){
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('crowdplay-theme', next); } catch(e){}
+      document.querySelectorAll('.theme-toggle').forEach(function(b){ b.textContent = next === 'dark' ? '\u2600' : '\u263e'; });
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var d = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.querySelectorAll('.theme-toggle').forEach(function(b){ b.textContent = d ? '\u2600' : '\u263e'; });
+    });
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/screen.css">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Space+Grotesk:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+  :root {
+    --paper: #F1EADA;
+    --paper-2: #FBF7EE;
+    --paper-3: #ECE3D1;
+    --ink: #1B1714;
+    --ink-soft: #6B6055;
+    --tangerine: #FF5A2C;
+    --grape: #6C4CE0;
+    --leaf: #1B9E57;
+    --sky: #2E73E8;
+    --sun: #FFB100;
+    --shadow: 7px 7px 0 var(--ink);
+    --shadow-sm: 4px 4px 0 var(--ink);
+    --display: 'Bricolage Grotesque', sans-serif;
+    --body: 'Space Grotesk', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --invert-bg: #1B1714;
+    --invert-fg: #FBF7EE;
+  }
+  [data-theme="dark"] {
+    --paper: #14110E;
+    --paper-2: #201B16;
+    --paper-3: #2A241D;
+    --ink: #F2EADB;
+    --ink-soft: #A99C8B;
+    --invert-bg: #0E0C09;
+    --invert-fg: #F2EADB;
+    --shadow: 7px 7px 0 #000;
+    --shadow-sm: 4px 4px 0 #000;
+  }
+  .theme-toggle {
+    position: fixed;
+    top: 18px; right: 18px;
+    z-index: 60;
+    font-family: var(--mono);
+    font-size: 18px;
+    width: 46px; height: 46px;
+    display: grid; place-items: center;
+    background: var(--paper-2);
+    color: var(--ink);
+    border: 2.5px solid var(--ink);
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+  }
+  .theme-toggle:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    overflow: hidden;
+  }
+  .crt-overlay { display: none; }
+  .hidden { display: none !important; }
+
+  #bgCanvas { position: fixed; inset: 0; z-index: 0; }
+
+  .screen-panel {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 3.2vh 3.4vw;
+    animation: fade 0.5s ease both;
+  }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .neon-pink { color: var(--tangerine); }
+  .neon-cyan { color: var(--sky); }
+
+  /* ---------- LOBBY ---------- */
+  .lobby-header { text-align: center; margin-bottom: 2.6vh; }
+  .lobby-header h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(48px, 6.4vw, 104px);
+    letter-spacing: -0.03em;
+    line-height: 0.92;
+  }
+  .tagline {
+    font-family: var(--mono);
+    font-size: clamp(13px, 1.2vw, 19px);
+    text-transform: uppercase;
+    letter-spacing: 0.32em;
+    color: var(--ink-soft);
+    margin-top: 10px;
+  }
+  .lobby-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2.4vw;
+    align-items: stretch;
+    flex: 0 0 auto;
+  }
+  .lobby-card {
+    background: var(--paper-2);
+    border: 3px solid var(--ink);
+    border-radius: 26px;
+    box-shadow: var(--shadow);
+    padding: 2.8vh 2vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .lobby-card h3 {
+    font-family: var(--mono);
+    font-size: clamp(13px, 1.1vw, 18px);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-soft);
+    margin-bottom: 1.8vh;
+  }
+  #qrcode {
+    width: clamp(160px, 15vw, 260px);
+    aspect-ratio: 1;
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    padding: 10px;
+  }
+  #qrcode img { width: 100%; height: 100%; object-fit: contain; }
+  .qr-placeholder { font-family: var(--mono); font-size: 13px; color: var(--ink-soft); text-align: center; padding: 16px; }
+  .url-hint {
+    font-family: var(--body);
+    font-size: clamp(13px, 1vw, 17px);
+    color: var(--ink-soft);
+    margin-top: 1.6vh;
+  }
+  .join-url {
+    font-family: var(--mono);
+    font-size: clamp(12px, 0.95vw, 16px);
+    background: var(--paper-3);
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    padding: 8px 14px;
+    margin-top: 10px;
+    word-break: break-all;
+    text-align: center;
+  }
+  .room-code-card { background: var(--invert-bg); }
+  .room-code-card .label {
+    font-family: var(--mono);
+    font-size: clamp(13px, 1.1vw, 18px);
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: color-mix(in srgb, var(--invert-fg) 60%, transparent);
+  }
+  .room-code-val {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(90px, 13vw, 220px);
+    line-height: 0.9;
+    letter-spacing: 0.06em;
+    color: var(--sun);
+    margin: 1.2vh 0;
+  }
+  .lobby-status-pulse {
+    font-family: var(--mono);
+    font-size: clamp(12px, 1vw, 16px);
+    letter-spacing: 0.12em;
+    color: #FBF7EE;
+    background: var(--tangerine);
+    padding: 8px 18px;
+    border-radius: 999px;
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+  .player-roster { margin-top: auto; padding-top: 2.6vh; }
+  .player-roster h3 {
+    font-family: var(--mono);
+    font-size: clamp(13px, 1.1vw, 18px);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ink-soft);
+    margin-bottom: 1.6vh;
+  }
+  .player-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .player-avatar {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(14px, 1.2vw, 20px);
+    color: var(--ink);
+    background: var(--paper-2);
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    padding: 10px 20px;
+    box-shadow: var(--shadow-sm);
+    animation: pop 0.35s cubic-bezier(.2,1.4,.4,1) both;
+  }
+  @keyframes pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* ---------- GAMEPLAY ---------- */
+  .game-hud {
+    display: flex;
+    align-items: center;
+    gap: 2vw;
+    background: var(--paper-2);
+    border: 3px solid var(--ink);
+    border-radius: 18px;
+    box-shadow: var(--shadow-sm);
+    padding: 1.6vh 2vw;
+    margin-bottom: 2.4vh;
+  }
+  .hud-item { display: flex; flex-direction: column; gap: 5px; }
+  .hud-item.progress-container { flex: 1; }
+  .hud-label {
+    font-family: var(--mono);
+    font-size: clamp(11px, 0.9vw, 15px);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+  }
+  .hud-value {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(20px, 2vw, 36px);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+  .progress-container { flex-direction: row; align-items: center; gap: 16px; }
+  .progress-bar-bg {
+    flex: 1;
+    height: 22px;
+    background: var(--paper-3);
+    border: 3px solid var(--ink);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--tangerine);
+    border-radius: 999px;
+    transition: width 0.5s cubic-bezier(.2,.8,.2,1);
+  }
+
+  .canvas-container {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    min-height: 0;
+  }
+  #puzzleCanvas {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    aspect-ratio: 3 / 2;
+    background: var(--paper-2);
+    border: 3px solid var(--ink);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+  }
+  .activity-ticker {
+    margin-top: 2.2vh;
+    font-family: var(--mono);
+    font-size: clamp(14px, 1.3vw, 22px);
+    letter-spacing: 0.04em;
+    text-align: center;
+    background: var(--invert-bg);
+    color: var(--invert-fg);
+    border-radius: 999px;
+    padding: 12px 24px;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+  .activity-ticker.pulse { transform: scale(1.04); background: var(--tangerine); color: #FBF7EE; }
+
+  /* ---------- COMPLETION ---------- */
+  #completionScreen { justify-content: center; align-items: center; gap: 3vh; }
+  .completion-banner { text-align: center; }
+  .completion-banner h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(60px, 9vw, 150px);
+    letter-spacing: -0.03em;
+    line-height: 0.9;
+    color: var(--tangerine);
+  }
+  .sub-banner {
+    font-family: var(--mono);
+    font-size: clamp(14px, 1.4vw, 22px);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--ink-soft);
+    margin-top: 1.4vh;
+  }
+  .bounce-in { animation: bounceIn 0.7s cubic-bezier(.2,1.5,.4,1) both; }
+  @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  .completion-content {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 2.4vw;
+    width: min(1100px, 86vw);
+  }
+  .leaderboard-card, .stats-summary-card {
+    background: var(--paper-2);
+    border: 3px solid var(--ink);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    padding: 3vh 2.4vw;
+  }
+  .leaderboard-card h2, .stats-summary-card h2 {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(22px, 2.2vw, 38px);
+    margin-bottom: 2vh;
+    letter-spacing: -0.01em;
+  }
+  .leaderboard-list { display: flex; flex-direction: column; gap: 12px; }
+  .leaderboard-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--paper-3);
+    border: 2.5px solid var(--ink);
+    border-radius: 14px;
+    padding: 12px 18px;
+  }
+  .leaderboard-item.first-place { background: var(--sun); box-shadow: var(--shadow-sm); }
+  .leaderboard-item.first-place .rank,
+  .leaderboard-item.first-place .name,
+  .leaderboard-item.first-place .score { color: #1B1714; }
+  .leaderboard-item.first-place .pdot { border-color: #1B1714; }
+  .pdot { width: clamp(14px,1.3vw,20px); aspect-ratio: 1; border-radius: 50%; border: 2.5px solid var(--ink); flex: none; }
+  .rank-name { display: flex; align-items: center; gap: 14px; }
+  .rank { font-family: var(--display); font-weight: 800; font-size: clamp(20px, 1.8vw, 30px); min-width: 1.6em; }
+  .name { font-family: var(--display); font-weight: 700; font-size: clamp(18px, 1.6vw, 28px); }
+  .score { font-family: var(--mono); font-size: clamp(14px, 1.2vw, 20px); color: var(--ink-soft); }
+
+  .stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: clamp(15px, 1.3vw, 22px);
+    padding: 12px 0;
+    border-bottom: 2px dashed color-mix(in srgb, var(--ink) 25%, transparent);
+  }
+  .stat-row .val { font-family: var(--display); font-weight: 800; white-space: nowrap; }
+  .stats-summary-card .btn {
+    margin-top: 2.4vh;
+    width: 100%;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(15px, 1.3vw, 20px);
+    color: var(--invert-fg);
+    background: var(--invert-bg);
+    border: 3px solid var(--ink);
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+  }
+  .stats-summary-card .btn:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 var(--ink); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+  </style>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/screen.js" defer></script>
 </head>
 <body>
   <div class="crt-overlay"></div>
 
-  <!-- Background Stars Parallax Canvas -->
+  <!-- Background animated canvas -->
   <canvas id="bgCanvas"></canvas>
+  <button class="theme-toggle" id="themeToggle" type="button" onclick="cpToggleTheme()" aria-label="Toggle dark mode">☾</button>
 
   <!-- 1. LOBBY SCREEN (Waiting for start) -->
   <div id="lobbyScreen" class="screen-panel active">
     <div class="lobby-header">
-      <h1>CROWD<span class="neon-pink">PLAY</span></h1>
-      <p class="tagline">COMMUNITY PUZZLE CHALLENGE</p>
+      <h1>Crowd<span class="neon-pink">Play</span></h1>
+      <p class="tagline">Community Puzzle Challenge</p>
     </div>
 
     <div class="lobby-content">
       <div class="lobby-card qr-card">
-        <h3>JOIN THE GAME</h3>
+        <h3>Join the game</h3>
         <div id="qrcode">
-          <!-- QR Code dynamically injected -->
-          <div class="qr-placeholder">Generating connection protocol...</div>
+          <div class="qr-placeholder">Generating QR code…</div>
         </div>
         <p class="url-hint">Scan with your phone camera</p>
         <div class="join-url" id="joinUrlVal">https://localhost:3000/join/----</div>
       </div>
 
       <div class="lobby-card room-code-card">
-        <span class="label">ROOM CODE</span>
+        <span class="label">Room code</span>
         <div class="room-code-val" id="roomCodeVal">----</div>
-        <div class="lobby-status-pulse" id="statusText">WAITING FOR ADMIN PROTOCOL...</div>
+        <div class="lobby-status-pulse" id="statusText">Waiting for the host…</div>
       </div>
     </div>
 
     <!-- Active Player Avatars list -->
     <div class="player-roster">
-      <h3>Active Pilots (<span id="playerCount">0</span>)</h3>
+      <h3>Players in the room (<span id="playerCount">0</span>)</h3>
       <div class="player-grid" id="playerGrid">
         <!-- Avatars will be dynamically created here -->
       </div>
@@ -53,66 +434,63 @@
 
   <!-- 2. GAMEPLAY SCREEN (Puzzle canvas) -->
   <div id="gameplayScreen" class="screen-panel hidden">
-    <!-- Top HUD status bar -->
     <div class="game-hud">
       <div class="hud-item">
-        <span class="hud-label">ACTIVITY</span>
-        <span class="hud-value neon-cyan">COLLABORATIVE JIGSAW</span>
+        <span class="hud-label">Game</span>
+        <span class="hud-value neon-cyan">Collaborative Jigsaw</span>
       </div>
       <div class="hud-item progress-container">
-        <span class="hud-label">SOLVED</span>
+        <span class="hud-label">Solved</span>
         <div class="progress-bar-bg">
           <div class="progress-bar-fill" id="hudProgressFill" style="width: 0%"></div>
         </div>
         <span class="hud-value" id="hudProgressText">0%</span>
       </div>
       <div class="hud-item">
-        <span class="hud-label">ROOM</span>
+        <span class="hud-label">Room</span>
         <span class="hud-value neon-pink" id="hudRoomCode">----</span>
       </div>
     </div>
 
-    <!-- The actual Jigsaw canvas board -->
     <div class="canvas-container">
       <canvas id="puzzleCanvas" width="1200" height="800"></canvas>
     </div>
 
-    <!-- Real-time activity ticker -->
     <div class="activity-ticker" id="activityTicker">
-      SYSTEM ONLINE — Solvers ready
+      Game on — drag your pieces into place!
     </div>
   </div>
 
   <!-- 3. GAME OVER / COMPLETED SCREEN -->
   <div id="completionScreen" class="screen-panel hidden">
     <div class="completion-banner">
-      <h1 class="bounce-in">PUZZLE SOLVED</h1>
-      <p class="sub-banner">OUTSTANDING COMMUNITY COORDINATION</p>
+      <h1 class="bounce-in">Puzzle Solved!</h1>
+      <p class="sub-banner">Great teamwork, everyone</p>
     </div>
 
     <div class="completion-content">
       <div class="leaderboard-card">
-        <h2>🏆 TOP SOLVERS</h2>
+        <h2>🏆 Top players</h2>
         <div class="leaderboard-list" id="leaderboardList">
-          <!-- Leaderboard item template -->
+          <!-- Leaderboard items injected here -->
         </div>
       </div>
-      
+
       <div class="stats-summary-card">
-        <h2>MISSION ANALYSIS</h2>
+        <h2>Recap</h2>
         <div class="stat-row">
-          <span>Total Slices Placed</span>
+          <span>Pieces placed</span>
           <span class="val" id="totalSlicesPlaced">0</span>
         </div>
         <div class="stat-row">
-          <span>Solving Duration</span>
+          <span>Time to solve</span>
           <span class="val" id="solvedDuration">0s</span>
         </div>
         <div class="stat-row">
-          <span>System Rank</span>
-          <span class="val neon-cyan">S-CLASS</span>
+          <span>Team rating</span>
+          <span class="val neon-cyan">Brilliant</span>
         </div>
-        <button class="btn" onclick="window.location.reload()">Return to Setup</button>
+        <button class="btn" onclick="window.location.reload()">Set up another game</button>
       </div>
     </div>
   </div>

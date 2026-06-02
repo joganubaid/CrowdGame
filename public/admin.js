@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('error-message', (msg) => {
       consoleLogMsg(`[ERROR] ${msg}`);
-      alert(msg);
+      if (window.crowdOverlay) { window.crowdOverlay('Something went wrong', msg); } else { alert(msg); }
     });
   }
 

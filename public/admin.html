@@ -3,11 +3,475 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CrowdPlay | Admin Setup & Control Panel</title>
+  <title>CrowdPlay — Admin Console</title>
+  <script>
+    (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('crowdplay-theme') || 'light'); } catch(e){} })();
+    function cpToggleTheme(){
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('crowdplay-theme', next); } catch(e){}
+      document.querySelectorAll('.theme-toggle').forEach(function(b){ b.textContent = next === 'dark' ? '\u2600' : '\u263e'; });
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var d = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.querySelectorAll('.theme-toggle').forEach(function(b){ b.textContent = d ? '\u2600' : '\u263e'; });
+    });
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/admin.css">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Space+Grotesk:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+  :root {
+    --paper: #F1EADA;
+    --paper-2: #FBF7EE;
+    --paper-3: #ECE3D1;
+    --ink: #1B1714;
+    --ink-soft: #6B6055;
+    --line: #1B1714;
+    --tangerine: #FF5A2C;
+    --grape: #6C4CE0;
+    --leaf: #1B9E57;
+    --sky: #2E73E8;
+    --sun: #FFB100;
+    --danger: #E23B2E;
+    --shadow: 5px 5px 0 var(--ink);
+    --shadow-sm: 3px 3px 0 var(--ink);
+    --display: 'Bricolage Grotesque', sans-serif;
+    --body: 'Space Grotesk', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 16px;
+    --color-cyan: var(--sky);
+    --invert-bg: #1B1714;
+    --invert-fg: #FBF7EE;
+  }
+  [data-theme="dark"] {
+    --paper: #14110E;
+    --paper-2: #201B16;
+    --paper-3: #2A241D;
+    --ink: #F2EADB;
+    --ink-soft: #A99C8B;
+    --invert-bg: #0E0C09;
+    --invert-fg: #F2EADB;
+    --shadow: 5px 5px 0 #000;
+    --shadow-sm: 3px 3px 0 #000;
+  }
+  .theme-toggle {
+    font-family: var(--mono);
+    font-size: 16px;
+    line-height: 1;
+    width: 42px; height: 42px;
+    display: grid; place-items: center;
+    background: var(--paper-2);
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  .theme-toggle:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    min-height: 100vh;
+    position: relative;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(var(--ink) 0.6px, transparent 0.7px);
+    background-size: 22px 22px;
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .glow-bg, .crt-overlay { display: none; }
+  .hidden { display: none !important; }
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 26px 28px 56px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 22px;
+    margin-bottom: 26px;
+    border-bottom: 2px dashed color-mix(in srgb, var(--ink) 28%, transparent);
+  }
+  .brand {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .neon-text-cyan { color: var(--ink); }
+  .neon-text-pink { color: var(--tangerine); }
+  .badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: var(--invert-bg);
+    color: var(--invert-fg);
+    border: 2px solid var(--ink);
+    padding: 4px 10px;
+    border-radius: 999px;
+  }
+  .system-status {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-soft);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border: 2px solid var(--ink);
+    background: var(--paper-2);
+    padding: 8px 14px;
+    border-radius: 999px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.green { background: var(--leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leaf) 25%, transparent); }
+  .panel { animation: rise 0.4s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  #loginSection {
+    max-width: 460px;
+    margin: 6vh auto 0;
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .panel-header {
+    background: var(--invert-bg);
+    color: var(--invert-fg);
+    padding: 20px 28px;
+  }
+  .panel-header h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: -0.01em;
+  }
+  .panel-body { padding: 28px; }
+  .panel-body > p {
+    color: var(--ink-soft);
+    font-size: 15px;
+    line-height: 1.5;
+    margin-bottom: 22px;
+  }
+  .form-group { margin-bottom: 20px; }
+  label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin-bottom: 9px;
+  }
+  input[type="text"],
+  input[type="password"],
+  input[type="number"],
+  select {
+    width: 100%;
+    font-family: var(--body);
+    font-size: 16px;
+    color: var(--ink);
+    background: var(--paper);
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    padding: 13px 15px;
+    outline: none;
+    transition: box-shadow 0.12s ease, transform 0.12s ease;
+  }
+  input::placeholder { color: color-mix(in srgb, var(--ink) 40%, transparent); }
+  input:focus, select:focus {
+    box-shadow: var(--shadow-sm);
+    transform: translate(-1px, -1px);
+  }
+  .select-wrapper { position: relative; }
+  .select-wrapper::after {
+    content: "▾";
+    position: absolute;
+    right: 16px; top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--ink);
+  }
+  select { appearance: none; cursor: pointer; }
+  .error-text {
+    color: var(--danger);
+    font-family: var(--mono);
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .btn {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--ink);
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    padding: 13px 20px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--ink); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: var(--shadow-sm); }
+  .btn-block { display: block; width: 100%; }
+  .btn-sm { font-size: 13px; padding: 9px 14px; }
+  .btn-primary { background: var(--tangerine); color: var(--paper-2); }
+  .btn-cyan { background: var(--sky); color: var(--paper-2); }
+  .btn-secondary { background: var(--paper-3); }
+  .btn-danger { background: var(--danger); color: var(--paper-2); }
+  .grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .form-group.grid-2col { gap: 16px; }
+  .panel-card {
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    padding: 26px;
+  }
+  .panel-card h3 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+    margin-bottom: 22px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+  .panel-card h3::before {
+    content: "";
+    width: 14px; height: 14px;
+    background: var(--tangerine);
+    border: 2.5px solid var(--ink);
+    border-radius: 4px;
+    flex: none;
+  }
+  #roomConsoleCard h3::before { background: var(--grape); }
+  .file-upload-zone {
+    border: 2.5px dashed var(--ink);
+    border-radius: 14px;
+    background: var(--paper-3);
+    padding: 30px 20px;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .file-upload-zone:hover { background: color-mix(in srgb, var(--tangerine) 12%, var(--paper-3)); }
+  .upload-icon { font-size: 30px; }
+  .upload-text { font-family: var(--display); font-weight: 700; font-size: 15px; }
+  .upload-subtext { font-family: var(--mono); font-size: 11.5px; color: var(--ink-soft); }
+  .upload-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-soft);
+    padding: 16px;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 3px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    border-top-color: var(--tangerine);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .image-preview {
+    position: relative;
+    border: 2.5px solid var(--ink);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--paper-3);
+  }
+  .image-preview img { display: block; width: 100%; max-height: 240px; object-fit: cover; }
+  .image-preview .btn { position: absolute; bottom: 12px; right: 12px; }
+  .console-placeholder {
+    border: 2.5px dashed color-mix(in srgb, var(--ink) 35%, transparent);
+    border-radius: 14px;
+    padding: 44px 24px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+  }
+  .console-header-info {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .console-header-info > div {
+    flex: 1;
+    background: var(--paper-3);
+    border: 2.5px solid var(--ink);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+  .console-header-info .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .console-header-info .value { font-family: var(--display); font-weight: 800; }
+  .room-code-display {
+    font-size: 32px;
+    letter-spacing: 0.14em;
+    color: var(--tangerine);
+  }
+  .status-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-weight: 500;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    padding: 6px 12px;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    background: var(--sun);
+    color: var(--ink);
+  }
+  .status-badge.active { background: var(--leaf); color: var(--paper-2); }
+  .status-badge.completed { background: var(--grape); color: var(--paper-2); }
+  .qr-container-card {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    background: var(--paper-3);
+    border: 2.5px solid var(--ink);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  #qrCodeWrapper {
+    flex: none;
+    width: 116px; height: 116px;
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+  #qrCodeWrapper img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+  .join-info p { font-size: 13px; color: var(--ink-soft); margin-bottom: 8px; }
+  .join-info code {
+    display: block;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    word-break: break-all;
+  }
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .metric-card {
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: var(--shadow-sm);
+    padding: 18px;
+    text-align: center;
+  }
+  .metric-val {
+    display: block;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 38px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .metric-card:nth-child(1) .metric-val { color: var(--sky); }
+  .metric-card:nth-child(2) .metric-val { color: var(--tangerine); }
+  .metric-label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    margin-top: 6px;
+  }
+  .action-buttons-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .live-activity-log h4 {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+  .log-output {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    background: #0E0C09;
+    color: #9BE8B6;
+    border-radius: 12px;
+    padding: 16px;
+    height: 160px;
+    overflow-y: auto;
+  }
+  @media (max-width: 880px) {
+    .grid-2col { grid-template-columns: 1fr; }
+    .form-group.grid-2col { grid-template-columns: 1fr 1fr; }
+    .qr-container-card { flex-direction: column; text-align: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+  .sys-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); padding: 24px; animation: fade 0.2s ease both; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .sys-overlay-card { background: var(--paper-2); border: 2.5px solid var(--ink); border-radius: 20px; box-shadow: var(--shadow); padding: 28px; max-width: 380px; width: 100%; text-align: center; }
+  .sys-overlay-card h3 { font-family: var(--display); font-weight: 800; font-size: 23px; margin-bottom: 10px; letter-spacing: -0.01em; }
+  .sys-overlay-card p { color: var(--ink-soft); font-size: 15px; line-height: 1.5; margin-bottom: 22px; }
+  .sys-overlay-card .btn { width: 100%; }
+  </style>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/admin.js" defer></script>
 </head>
@@ -18,28 +482,31 @@
   <div class="container">
     <header>
       <div class="brand">
-        <span class="neon-text-cyan">CROWD</span><span class="neon-text-pink">PLAY</span>
-        <span class="badge">ADMIN v1.0</span>
+        <span class="neon-text-cyan">Crowd</span><span class="neon-text-pink">Play</span>
+        <span class="badge">Admin</span>
       </div>
-      <div class="system-status">
-        <span class="dot green"></span> Connected to Server
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="system-status">
+          <span class="dot green"></span> Connected to server
+        </div>
+        <button class="theme-toggle" id="themeToggle" type="button" onclick="cpToggleTheme()" aria-label="Toggle dark mode">☾</button>
       </div>
     </header>
 
     <!-- 1. LOGIN SCREEN -->
     <div id="loginSection" class="panel active">
       <div class="panel-header">
-        <h2>System Authentication</h2>
+        <h2>Sign in to the console</h2>
       </div>
       <div class="panel-body">
-        <p>Access the control console to initialize events and configure social game modules.</p>
+        <p>Set up rooms, upload puzzle images, and run live games from here.</p>
         <form id="loginForm">
           <div class="form-group">
-            <label for="adminPassword">Console Authorization Key</label>
+            <label for="adminPassword">Admin password</label>
             <input type="password" id="adminPassword" placeholder="••••••••" required>
           </div>
-          <button type="submit" class="btn btn-primary btn-block">Authenticate Session</button>
-          <p id="loginError" class="error-text hidden">Invalid console authentication key.</p>
+          <button type="submit" class="btn btn-primary btn-block">Enter console</button>
+          <p id="loginError" class="error-text hidden">That password didn’t work — try again.</p>
         </form>
       </div>
     </div>
@@ -49,72 +516,73 @@
       <div class="grid-2col">
         <!-- Setup Area -->
         <div class="panel-card">
-          <h3>1. Activity Setup</h3>
+          <h3>Set up a game</h3>
           <form id="setupForm">
             <div class="form-group">
-              <label for="roomCodeInput">Room Code (Leave blank for random)</label>
+              <label for="roomCodeInput">Room code (leave blank for random)</label>
               <input type="text" id="roomCodeInput" maxlength="4" placeholder="e.g. PLAY" style="text-transform: uppercase;">
             </div>
-            
+
             <div class="form-group">
-              <label>Module Selection</label>
+              <label>Game mode</label>
               <div class="select-wrapper">
                 <select id="activityType">
-                  <option value="jigsaw">🧩 Collaborative Jigsaw Puzzle</option>
-                  <option value="trivia" disabled>❓ Live Event Trivia (Coming Soon)</option>
-                  <option value="wordcloud" disabled>☁️ Live Audience Word Cloud (Coming Soon)</option>
+                  <option value="jigsaw">Collaborative Jigsaw</option>
+                  <option value="trivia" disabled>Live Trivia (coming soon)</option>
+                  <option value="wordcloud" disabled>Word Cloud (coming soon)</option>
                 </select>
               </div>
             </div>
 
             <div class="grid-2col form-group">
               <div>
-                <label for="gridRows">Puzzle Rows (Height)</label>
+                <label for="gridRows">Rows</label>
                 <input type="number" id="gridRows" min="2" max="10" value="4">
               </div>
               <div>
-                <label for="gridCols">Puzzle Columns (Width)</label>
+                <label for="gridCols">Columns</label>
                 <input type="number" id="gridCols" min="2" max="12" value="6">
               </div>
             </div>
 
             <div class="form-group">
-              <label for="puzzleImageFile">Puzzle Board Image</label>
+              <label for="puzzleImageFile">Puzzle image</label>
               <div class="file-upload-zone" id="dropzone">
-                <span class="upload-icon">📸</span>
-                <span class="upload-text">Drag & drop image or click to select</span>
-                <span class="upload-subtext">Supports PNG, JPEG up to 10MB</span>
+                <span class="upload-icon">🖼️</span>
+                <span class="upload-text">Drag &amp; drop, or click to choose</span>
+                <span class="upload-subtext">PNG or JPEG, up to 10MB</span>
                 <input type="file" id="puzzleImageFile" accept="image/*" class="hidden">
               </div>
               <div id="uploadStatus" class="upload-status hidden">
-                <div class="spinner"></div> Processing image buffers...
+                <div class="spinner"></div> Slicing image into pieces…
               </div>
               <div id="imagePreviewContainer" class="image-preview hidden">
                 <img id="imagePreview" src="" alt="Preview">
-                <button type="button" id="clearImageBtn" class="btn btn-danger btn-sm">Remove Image</button>
+                <button type="button" id="clearImageBtn" class="btn btn-danger btn-sm">Remove</button>
               </div>
             </div>
 
-            <button type="submit" id="createRoomBtn" class="btn btn-cyan btn-block">Initialize Screen Room</button>
+            <button type="submit" id="createRoomBtn" class="btn btn-cyan btn-block">Create room</button>
           </form>
         </div>
 
         <!-- Live Status / Room Control Area -->
         <div class="panel-card" id="roomConsoleCard">
-          <h3>2. Event Live Console</h3>
+          <h3>Live game</h3>
           <div class="console-placeholder" id="consolePlaceholder">
-            Initialize an activity room in the setup panel to begin event broadcast.
+            Create a room on the left to start a game and watch players join here.
           </div>
-          
+
           <div class="console-active hidden" id="consoleActive">
             <div class="console-header-info">
               <div>
-                <span class="label">ROOM CODE</span>
+                <span class="label">Room code</span>
                 <span class="value room-code-display" id="activeRoomCode">----</span>
               </div>
               <div>
-                <span class="label">STATUS</span>
-                <span class="value status-badge" id="activeRoomStatus">WAITING</span>
+                <span class="label">Status</span>
+                <br>
+                <span class="value status-badge" id="activeRoomStatus">Waiting</span>
               </div>
             </div>
 
@@ -123,32 +591,32 @@
                 <!-- QR Code generated here -->
               </div>
               <div class="join-info">
-                <p>Attendees scan QR to join, or visit:</p>
+                <p>Players scan to join, or open:</p>
                 <code id="activeJoinUrl">https://localhost:3000/join/----</code>
-                <button class="btn btn-secondary btn-sm" id="copyUrlBtn">Copy Join URL</button>
+                <button class="btn btn-secondary btn-sm" id="copyUrlBtn">Copy join link</button>
               </div>
             </div>
 
             <div class="metrics-grid">
               <div class="metric-card">
                 <span class="metric-val" id="attendeesCount">0</span>
-                <span class="metric-label">Attendees Joined</span>
+                <span class="metric-label">Players joined</span>
               </div>
               <div class="metric-card">
                 <span class="metric-val" id="puzzleProgress">0%</span>
-                <span class="metric-label">Puzzle Progress</span>
+                <span class="metric-label">Puzzle solved</span>
               </div>
             </div>
 
             <div class="action-buttons-group">
-              <button class="btn btn-primary" id="startActivityBtn">🚀 Start Activity</button>
-              <button class="btn btn-danger" id="resetRoomBtn">🔄 Reset Session</button>
+              <button class="btn btn-primary" id="startActivityBtn">Start game</button>
+              <button class="btn btn-danger" id="resetRoomBtn">Reset</button>
             </div>
-            
+
             <div class="live-activity-log">
-              <h4>Console Monitor</h4>
+              <h4>Activity log</h4>
               <div class="log-output" id="consoleLog">
-                [SYSTEM] Awaiting pilot activation...
+                [system] Waiting for players to join…
               </div>
             </div>
           </div>
@@ -156,5 +624,24 @@
       </div>
     </div>
   </div>
+
+  <div id="sysOverlay" class="sys-overlay hidden">
+    <div class="sys-overlay-card">
+      <h3 id="sysOverlayTitle">Heads up</h3>
+      <p id="sysOverlayMsg"></p>
+      <button class="btn btn-primary" id="sysOverlayBtn" type="button">OK</button>
+    </div>
+  </div>
+  <script>
+    window.crowdOverlay = function(title, msg, label, onClick){
+      var o = document.getElementById('sysOverlay');
+      document.getElementById('sysOverlayTitle').textContent = title || 'Heads up';
+      document.getElementById('sysOverlayMsg').textContent = msg || '';
+      var b = document.getElementById('sysOverlayBtn');
+      b.textContent = label || 'OK';
+      b.onclick = onClick || function(){ o.classList.add('hidden'); };
+      o.classList.remove('hidden');
+    };
+  </script>
 </body>
 </html>

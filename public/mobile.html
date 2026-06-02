@@ -3,35 +3,539 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CrowdPlay | Pilot Controller</title>
+  <title>CrowdPlay — Player</title>
+  <script>
+    (function(){ try { document.documentElement.setAttribute('data-theme', localStorage.getItem('crowdplay-theme') || 'light'); } catch(e){} })();
+    function cpToggleTheme(){
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('crowdplay-theme', next); } catch(e){}
+      document.querySelectorAll('.theme-toggle').forEach(function(b){ b.textContent = next === 'dark' ? '\u2600' : '\u263e'; });
+    }
+    document.addEventListener('DOMContentLoaded', function(){
+      var d = document.documentElement.getAttribute('data-theme') === 'dark';
+      document.querySelectorAll('.theme-toggle').forEach(function(b){ b.textContent = d ? '\u2600' : '\u263e'; });
+    });
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/mobile.css">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Space+Grotesk:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+  :root {
+    --paper: #F1EADA;
+    --paper-2: #FBF7EE;
+    --paper-3: #ECE3D1;
+    --ink: #1B1714;
+    --ink-soft: #6B6055;
+    --tangerine: #FF5A2C;
+    --grape: #6C4CE0;
+    --leaf: #1B9E57;
+    --sky: #2E73E8;
+    --sun: #FFB100;
+    --shadow: 5px 5px 0 var(--ink);
+    --shadow-sm: 3px 3px 0 var(--ink);
+    --display: 'Bricolage Grotesque', sans-serif;
+    --body: 'Space Grotesk', sans-serif;
+    --mono: 'DM Mono', monospace;
+    /* mobile.js references --color-cyan for the waiting hint */
+    --color-cyan: var(--sky);
+    --invert-bg: #1B1714;
+    --invert-fg: #FBF7EE;
+  }
+  [data-theme="dark"] {
+    --paper: #14110E;
+    --paper-2: #201B16;
+    --paper-3: #2A241D;
+    --ink: #F2EADB;
+    --ink-soft: #A99C8B;
+    --invert-bg: #0E0C09;
+    --invert-fg: #F2EADB;
+    --shadow: 5px 5px 0 #000;
+    --shadow-sm: 3px 3px 0 #000;
+  }
+  .theme-toggle {
+    position: fixed;
+    top: 14px; right: 14px;
+    z-index: 50;
+    font-family: var(--mono);
+    font-size: 16px;
+    width: 42px; height: 42px;
+    display: grid; place-items: center;
+    background: var(--paper-2);
+    color: var(--ink);
+    border: 2.5px solid var(--ink);
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+  }
+  .theme-toggle:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body.mobile-body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(var(--ink) 0.6px, transparent 0.7px);
+    background-size: 22px 22px;
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .glow-bg, .crt-overlay { display: none; }
+  .hidden { display: none !important; }
+
+  /* ----- CARD-STYLE SCREENS (join / waiting / complete) ----- */
+  .mobile-card {
+    position: relative;
+    z-index: 1;
+    margin: auto;
+    width: 100%;
+    max-width: 440px;
+    padding: 22px;
+  }
+  .mobile-card > .card-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .card-header h1, .card-header h2 {
+    font-family: var(--display);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .card-header h1 { font-size: 42px; }
+  .card-header h2 { font-size: 26px; }
+  .neon-pink { color: var(--tangerine); }
+  .neon-cyan { color: var(--ink); }
+  .neon-green { color: var(--leaf); }
+  .tagline {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    margin-top: 8px;
+  }
+  .card-body {
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .desc { color: var(--ink-soft); font-size: 15px; line-height: 1.55; margin-bottom: 20px; }
+  .text-center { text-align: center; }
+  .text-green { color: var(--leaf); }
+
+  .form-group { margin-bottom: 18px; }
+  label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    margin-bottom: 9px;
+  }
+  input[type="text"] {
+    width: 100%;
+    font-family: var(--body);
+    font-size: 18px;
+    color: var(--ink);
+    background: var(--paper);
+    border: 2.5px solid var(--ink);
+    border-radius: 13px;
+    padding: 15px 16px;
+    outline: none;
+  }
+  input::placeholder { color: color-mix(in srgb, var(--ink) 40%, transparent); }
+  input:focus { box-shadow: var(--shadow-sm); }
+
+  .room-code-badge {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 40px;
+    letter-spacing: 0.18em;
+    text-align: center;
+    color: var(--tangerine);
+    background: var(--paper);
+    border: 2.5px dashed var(--ink);
+    border-radius: 13px;
+    padding: 12px;
+  }
+
+  .btn {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 17px;
+    color: var(--ink);
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 13px;
+    padding: 16px 20px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn-block { display: block; width: 100%; }
+  .btn-primary { background: var(--tangerine); color: var(--paper-2); }
+  .btn-secondary { background: var(--paper-3); }
+
+  /* waiting */
+  .pilot-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--leaf);
+    color: var(--paper-2);
+    padding: 6px 13px;
+    border-radius: 999px;
+    margin-bottom: 12px;
+  }
+  .joined-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--ink-soft);
+    background: var(--paper-3);
+    border: 2px solid var(--ink);
+    border-radius: 13px;
+    padding: 14px;
+    margin-bottom: 20px;
+  }
+  .ping-circle {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--tangerine);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--tangerine) 60%, transparent);
+    animation: ping 1.4s ease-out infinite;
+  }
+  @keyframes ping {
+    0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tangerine) 55%, transparent); }
+    70%, 100% { box-shadow: 0 0 0 12px transparent; }
+  }
+  .player-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .summary-item {
+    background: var(--paper-3);
+    border: 2.5px solid var(--ink);
+    border-radius: 13px;
+    padding: 14px;
+    text-align: center;
+  }
+  .summary-item .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+  .summary-item .value {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 19px;
+  }
+
+  /* complete */
+  .personal-score-card {
+    background: var(--invert-bg);
+    color: var(--invert-fg);
+    border-radius: 18px;
+    padding: 26px;
+    text-align: center;
+    margin-bottom: 22px;
+  }
+  .personal-score-card .label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: color-mix(in srgb, var(--invert-fg) 65%, transparent);
+    margin-bottom: 4px;
+  }
+  .score-val {
+    display: block;
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 72px;
+    line-height: 1;
+    color: var(--sun);
+  }
+  .score-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: color-mix(in srgb, var(--invert-fg) 65%, transparent);
+  }
+
+  /* ----- GAMEPLAY (full screen) ----- */
+  .mobile-container {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    width: 100%;
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .gameplay-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: var(--shadow-sm);
+    padding: 11px 15px;
+    margin-bottom: 12px;
+  }
+  .pilot-info { display: flex; align-items: center; gap: 9px; }
+  .p-color-dot {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2.5px solid var(--ink);
+    background: var(--tangerine);
+  }
+  .p-name { font-family: var(--display); font-weight: 800; font-size: 16px; }
+  .gameplay-progress { text-align: right; }
+  .gameplay-progress > span:first-child {
+    display: block;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+  }
+  .progress-pct {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: 22px;
+    color: var(--tangerine);
+  }
+
+  .workspace-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--paper-2);
+    border: 2.5px solid var(--ink);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 14px;
+  }
+  .workspace-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .workspace-label::before {
+    content: "";
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    background: var(--tangerine);
+    border: 2px solid var(--ink);
+  }
+
+  .drag-board {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    background: var(--ink);
+    background-size: 100% 100%;
+    background-position: center;
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .grid-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    pointer-events: none;
+  }
+  .grid-overlay > div {
+    border-right: 1px solid rgba(255,255,255,0.14);
+    border-bottom: 1px solid rgba(255,255,255,0.14);
+    transition: background 0.1s ease, box-shadow 0.1s ease;
+  }
+  .grid-overlay > div.cell-hot {
+    background: color-mix(in srgb, var(--tangerine) 38%, transparent);
+    box-shadow: inset 0 0 0 2px var(--tangerine);
+  }
+  #peekLayer {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: fill;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .drag-board.peeking #peekLayer { opacity: 1; }
+  .target-minimap { display: none; }
+  .minimap-hint {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-align: center;
+    color: var(--ink-soft);
+  }
+  .pieces-pool { position: absolute; inset: 0; pointer-events: none; }
+  .pieces-pool > * { pointer-events: auto; }
+
+  .draggable-piece {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: grab;
+    touch-action: none;
+    z-index: 5;
+    border: 2.5px solid var(--paper-2);
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px var(--ink), 4px 6px 14px rgba(0,0,0,0.45);
+    overflow: hidden;
+  }
+  .draggable-piece img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+  .draggable-piece.dragging { cursor: grabbing; z-index: 20; box-shadow: 0 0 0 2px var(--tangerine), 0 12px 26px rgba(0,0,0,0.5); }
+  .draggable-piece.shake { animation: shake 0.5s ease; }
+  @keyframes shake {
+    0%,100% { transform: translate(-50%, -50%); }
+    20% { transform: translate(calc(-50% - 9px), -50%) rotate(-4deg); }
+    40% { transform: translate(calc(-50% + 9px), -50%) rotate(4deg); }
+    60% { transform: translate(calc(-50% - 6px), -50%) rotate(-2deg); }
+    80% { transform: translate(calc(-50% + 6px), -50%) rotate(2deg); }
+  }
+
+  /* piece selector tabs */
+  .piece-selector-container {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    margin-top: 12px;
+    padding-bottom: 2px;
+  }
+  .piece-tab {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: var(--paper-3);
+    border: 2.5px solid var(--ink);
+    border-radius: 12px;
+    padding: 8px 12px 8px 8px;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.1s ease;
+  }
+  .piece-tab.active { background: var(--sun); box-shadow: var(--shadow-sm); transform: translate(-1px,-1px); }
+  .piece-tab.active .tab-title, .piece-tab.active .tab-target { color: #1B1714; }
+  .piece-tab-thumb {
+    width: 36px; height: 36px;
+    border: 2px solid var(--ink);
+    border-radius: 6px;
+    overflow: hidden;
+    flex: none;
+    background: var(--ink);
+  }
+  .piece-tab-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .piece-tab-info { display: flex; flex-direction: column; }
+  .tab-title { font-family: var(--display); font-weight: 700; font-size: 13px; }
+  .tab-target { font-family: var(--mono); font-size: 10px; color: var(--ink-soft); }
+
+  .gameplay-footer { margin-top: 12px; }
+  .tip-box {
+    font-family: var(--body);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    background: var(--paper-2);
+    border: 2px dashed var(--ink);
+    border-radius: 13px;
+    padding: 13px 15px;
+  }
+  .workspace-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .workspace-head .workspace-label { margin-bottom: 0; }
+  .peek-btn {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    background: var(--paper-3);
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    padding: 6px 13px;
+    cursor: pointer;
+    user-select: none;
+    touch-action: none;
+  }
+  .peek-btn:active, .peek-btn.held { background: var(--sun); }
+  .sys-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: rgba(0,0,0,0.55); backdrop-filter: blur(3px); padding: 24px; }
+  .sys-overlay-card { background: var(--paper-2); border: 2.5px solid var(--ink); border-radius: 20px; box-shadow: var(--shadow); padding: 28px; max-width: 360px; width: 100%; text-align: center; }
+  .sys-overlay-card h3 { font-family: var(--display); font-weight: 800; font-size: 23px; margin-bottom: 10px; letter-spacing: -0.01em; }
+  .sys-overlay-card p { color: var(--ink-soft); font-size: 15px; line-height: 1.5; margin-bottom: 22px; }
+  .sys-overlay-card .btn { width: 100%; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  }
+  </style>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/mobile.js" defer></script>
 </head>
 <body class="mobile-body">
   <div class="glow-bg"></div>
   <div class="crt-overlay"></div>
+  <button class="theme-toggle" id="themeToggle" type="button" onclick="cpToggleTheme()" aria-label="Toggle dark mode">☾</button>
 
   <!-- 1. ENTRY / ONBOARDING SCREEN -->
   <div id="joinSection" class="mobile-card active">
     <div class="card-header">
-      <h1>CROWD<span class="neon-pink">PLAY</span></h1>
-      <p class="tagline">PILOT ACTIVATION PROTOCOL</p>
+      <h1>Crowd<span class="neon-pink">Play</span></h1>
+      <p class="tagline">Join the puzzle</p>
     </div>
     <div class="card-body">
       <form id="joinForm">
         <div class="form-group">
-          <label for="displayNameInput">Your Pilot Display Name</label>
-          <input type="text" id="displayNameInput" placeholder="e.g. Maverick" required maxlength="12">
+          <label for="displayNameInput">Your name</label>
+          <input type="text" id="displayNameInput" placeholder="e.g. Maya" required maxlength="12">
         </div>
         <div class="form-group">
-          <label>ROOM CODE</label>
+          <label>Room code</label>
           <div class="room-code-badge" id="joinRoomCode">----</div>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Join Solving Roster</button>
+        <button type="submit" class="btn btn-primary btn-block">Join the game</button>
       </form>
     </div>
   </div>
@@ -39,25 +543,25 @@
   <!-- 2. LOBBY / WAITING SCREEN -->
   <div id="waitingSection" class="mobile-card hidden">
     <div class="card-header">
-      <div class="pilot-badge" id="pilotBadge">PILOT CONNECTED</div>
-      <h2 id="welcomeText" class="neon-cyan">WELCOME, PILOT</h2>
+      <div class="pilot-badge" id="pilotBadge">You're in</div>
+      <h2 id="welcomeText" class="neon-cyan">Welcome</h2>
     </div>
     <div class="card-body">
-      <p class="desc">You have successfully registered on the event board. Waiting for the coordinator to start the solving activity...</p>
-      
+      <p class="desc">You're on the board. Hang tight — the game starts when the host kicks things off.</p>
+
       <div class="joined-indicator">
         <div class="ping-circle"></div>
-        <span>Awaiting Launch...</span>
+        <span>Waiting for the host to start…</span>
       </div>
 
       <div class="player-summary">
         <div class="summary-item">
-          <span class="label">COLOR CHANNEL</span>
-          <span class="value" id="playerColorVal" style="color: #ff007f;">PINK</span>
+          <span class="label">Your color</span>
+          <span class="value" id="playerColorVal" style="color: #FF5A2C;">PINK</span>
         </div>
         <div class="summary-item">
-          <span class="label">STATUS</span>
-          <span class="value text-green">READY</span>
+          <span class="label">Status</span>
+          <span class="value text-green">Ready</span>
         </div>
       </div>
     </div>
@@ -68,26 +572,30 @@
     <header class="gameplay-header">
       <div class="pilot-info">
         <span class="p-color-dot" id="headerColorDot"></span>
-        <span class="p-name" id="headerPilotName">PILOT</span>
+        <span class="p-name" id="headerPilotName">Player</span>
       </div>
       <div class="gameplay-progress">
-        <span>PUZZLE PROGRESS</span>
+        <span>Puzzle progress</span>
         <span class="progress-pct" id="gameProgressPct">0%</span>
       </div>
     </header>
 
     <!-- Main puzzle piece workspace -->
     <div class="workspace-card">
-      <div class="workspace-label">WORKSPACE: PLACE PIECE</div>
-      
+      <div class="workspace-head">
+        <div class="workspace-label">Drop your piece on the board</div>
+        <button class="peek-btn" id="peekBtn" type="button">👁 Hold to peek</button>
+      </div>
+
       <!-- Interactive drag board -->
       <div id="dragBoard" class="drag-board">
+        <!-- Full-picture peek layer (shown while holding the peek button) -->
+        <img id="peekLayer" alt="" draggable="false">
         <!-- Full background grid overlay (populated dynamically in JS) -->
         <div id="gridOverlay" class="grid-overlay"></div>
-        
+
         <!-- Target grid ghost guide map (hidden as board is now full reference) -->
         <div class="target-minimap" id="minimap" style="display: none;">
-          <!-- Thumbnail of target position -->
           <div class="minimap-hint">Drag piece to matching position here!</div>
         </div>
 
@@ -103,7 +611,7 @@
     <!-- Instructions / Footer stats -->
     <footer class="gameplay-footer">
       <div class="tip-box">
-        💡 Drag the piece onto the board to match its grid cell. When you're close, let go to snap it!
+        Drag a piece to where it belongs on the picture. When it lines up with the right cell, let go — it snaps into place.
       </div>
     </footer>
   </div>
@@ -111,20 +619,39 @@
   <!-- 4. SYSTEM COMPLETE SCREEN -->
   <div id="completeSection" class="mobile-card hidden">
     <div class="card-header">
-      <h1 class="neon-green">SOLVED!</h1>
-      <p class="tagline">MISSION ACCOMPLISHED</p>
+      <h1 class="neon-green">Solved!</h1>
+      <p class="tagline">Nice teamwork</p>
     </div>
     <div class="card-body">
-      <p class="desc text-center">The community has successfully resolved the image parameters. Great job!</p>
-      
+      <p class="desc text-center">The whole room put the picture back together. Thanks for playing!</p>
+
       <div class="personal-score-card">
-        <span class="label">YOUR CONTRIBUTION</span>
+        <span class="label">Your contribution</span>
         <span class="score-val" id="myContributionsVal">0</span>
-        <span class="score-label">Points Earned</span>
+        <span class="score-label">pieces placed</span>
       </div>
-      
-      <button class="btn btn-secondary btn-block" onclick="window.location.reload()">Reset Controller</button>
+
+      <button class="btn btn-secondary btn-block" onclick="window.location.reload()">Play again</button>
     </div>
   </div>
+
+  <div id="sysOverlay" class="sys-overlay hidden">
+    <div class="sys-overlay-card">
+      <h3 id="sysOverlayTitle">Heads up</h3>
+      <p id="sysOverlayMsg"></p>
+      <button class="btn btn-primary" id="sysOverlayBtn" type="button">OK</button>
+    </div>
+  </div>
+  <script>
+    window.crowdOverlay = function(title, msg, label, onClick){
+      var o = document.getElementById('sysOverlay');
+      document.getElementById('sysOverlayTitle').textContent = title || 'Heads up';
+      document.getElementById('sysOverlayMsg').textContent = msg || '';
+      var b = document.getElementById('sysOverlayBtn');
+      b.textContent = label || 'OK';
+      b.onclick = onClick || function(){ o.classList.add('hidden'); };
+      o.classList.remove('hidden');
+    };
+  </script>
 </body>
 </html>
