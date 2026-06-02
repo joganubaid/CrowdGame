@@ -2,7 +2,7 @@
 
 **CrowdPlay** is a real-time, mobile-controlled platform for big-screen audience activities, built with Node.js, Express, and Socket.io. A shared **Big Screen** (TV/projector) displays the activity while players join from their **phones** via a 4-character room code.
 
-**🔴 Live demo:** **https://crowdplay-nfxt.onrender.com** — open `/admin` (password `admin123`) and `/screen/DEMO` in separate tabs to host, and `/join/DEMO` to play. *(Free tier sleeps after ~15 min idle, so the first request may take ~30s to wake.)*
+**🔴 Live demo:** **https://crowdplay-nfxt.onrender.com** — open `/admin` (password `admin123`) and `/screen/DEMO` in separate tabs to host, and `/join/DEMO` to play. *(An UptimeRobot monitor pings `/health` every few minutes to keep the free instance awake, so it loads instantly.)*
 
 It ships with two modes:
 - 🧩 **Collaborative Jigsaw** — the room solves one puzzle together, dragging pieces from their phones.
@@ -101,6 +101,7 @@ Set via environment variables (all optional in development):
 
 - **CI:** GitHub Actions (`.github/workflows/ci.yml`) installs deps and runs `npm test` on every push to `main` and on PRs.
 - **CD (Render):** a [`render.yaml`](render.yaml) blueprint is included and the app is **live at https://crowdplay-nfxt.onrender.com**. On Render: **New → Blueprint → connect this repo**; Render builds the `Dockerfile` and, with `autoDeploy`, **redeploys on every push to `main`**. It runs a persistent container with **native WebSocket support** and terminates TLS at the edge, so the Socket.io server works unchanged. The blueprint sets `USE_SQLITE_FALLBACK=false` so it runs in-memory (Render's free disk is ephemeral); set `DATABASE_URL` to a Postgres instance for real persistence.
+- **Keep-alive:** an [UptimeRobot](https://uptimerobot.com) monitor pings `/health` on a short interval so the free Render instance never spins down — the live demo responds without the usual cold-start delay.
 - **Note on Vercel:** Vercel's serverless model can't host this app as-is — it's a long-lived Socket.io server with in-memory room state, which needs a persistent process and WebSockets. Container hosts (Render/Railway/Fly, or the included AWS ECS workflow) are the right fit. Vercel could only host a split-out static frontend with the realtime server elsewhere.
 
 ---
