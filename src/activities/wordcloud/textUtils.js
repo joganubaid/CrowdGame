@@ -43,10 +43,15 @@ const NEGATIVE_WORDS = new Set([
   'broken', 'fail', 'failure', 'frustrated', 'anxious', 'overwhelmed', 'worst'
 ]);
 
-function classifySentiment(word) {
-  if (POSITIVE_WORDS.has(word)) return 'positive';
-  if (NEGATIVE_WORDS.has(word)) return 'negative';
-  return 'neutral';
+function classifySentiment(term) {
+  let pos = false, neg = false;
+  for (const w of String(term).toLowerCase().split(/[\s-]+/)) {
+    if (POSITIVE_WORDS.has(w)) pos = true;
+    if (NEGATIVE_WORDS.has(w)) neg = true;
+  }
+  if (pos && !neg) return 'positive';
+  if (neg && !pos) return 'negative';
+  return 'neutral'; // none, or mixed
 }
 
 /**
@@ -76,16 +81,19 @@ function containsProfanity(normalized) {
 
 /**
  * Build a cloud from visible responses, ranked by weight (frequency + votes).
- * `votes` is an optional Map of word -> upvote count.
- * Returns up to `limit` `{ word, count, votes, weight, sentiment }` entries,
- * largest first.
+ *
+ * Each distinct *response* is one cloud entry (e.g. "data privacy" stays whole),
+ * so every answer a participant submits appears — duplicates merge and grow.
+ * Normalization (lower-casing, synonym folding) is what merges near-duplicates.
+ * `votes` is an optional Map of term -> upvote count.
+ * Returns up to `limit` `{ word, count, votes, weight, sentiment }` entries.
  */
 function buildCloud(responses, votes = new Map(), limit = 80) {
   const freq = new Map();
   for (const r of responses) {
-    for (const token of tokenize(r.normalizedText)) {
-      freq.set(token, (freq.get(token) || 0) + 1);
-    }
+    const term = (r.normalizedText || '').trim();
+    if (!term) continue;
+    freq.set(term, (freq.get(term) || 0) + 1);
   }
   return [...freq.entries()]
     .map(([word, count]) => {

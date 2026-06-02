@@ -38,8 +38,13 @@ function initSockets(io) {
         let room;
         if (existingRoom) {
           existingRoom.hostSocketId = socket.id;
+          // Cancel any pending close from a brief host disconnect (e.g. refresh).
+          if (existingRoom.closeTimer) {
+            clearTimeout(existingRoom.closeTimer);
+            existingRoom.closeTimer = null;
+          }
           room = existingRoom;
-          console.log(`Screen display connected to existing room: ${roomCode}`);
+          console.log(`Screen display reconnected to existing room: ${roomCode}`);
         } else {
           room = await roomManager.createRoom(socket.id, roomCode);
         }

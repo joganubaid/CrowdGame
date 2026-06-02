@@ -527,16 +527,14 @@ function renderWordCloud(state) {
   if (state.prompt) document.getElementById('wcScreenPrompt').textContent = state.prompt;
 
   const cloud = document.getElementById('wcCloud');
-  const empty = document.getElementById('wcEmpty');
   const words = state.cloud || [];
+  // Note: cloud.innerHTML is rewritten below, which removes any #wcEmpty child,
+  // so the empty state is re-rendered inline rather than relying on a stored node.
   if (words.length === 0) {
-    cloud.innerHTML = '';
-    cloud.appendChild(empty);
-    empty.style.display = '';
+    cloud.innerHTML = '<div class="wc-empty" id="wcEmpty">Waiting for the first response…</div>';
     updateSentimentBar([]);
     return;
   }
-  empty.style.display = 'none';
 
   const maxW = words[0].weight, minW = words[words.length - 1].weight;
   const MIN_PX = 22, MAX_PX = 96;

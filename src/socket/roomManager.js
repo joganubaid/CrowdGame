@@ -2,6 +2,11 @@ const { db } = require('../services/db');
 const redisService = require('../services/redis');
 const crypto = require('crypto');
 
+// Grace window before a room is closed after its host (big screen) disconnects.
+// A page refresh disconnects then reconnects within this window, so the room
+// (and everyone's progress) survives a refresh instead of being torn down.
+const HOST_GRACE_MS = 15000;
+
 const NEON_COLORS = [
   '#ff007f', // Neon Pink
   '#00f3ff', // Neon Cyan
@@ -160,22 +165,24 @@ class RoomManager {
   // Handle participant disconnection
   handleDisconnect(socketId) {
     for (const [roomCode, room] of this.rooms.entries()) {
-      // 1. Check if host disconnected
+      // 1. Check if the host (big screen) disconnected
       if (room.hostSocketId === socketId) {
-        console.log(`Host disconnected from room: ${roomCode}`);
-        
-        // Notify all participants
-        this.io.to(roomCode).emit('host-disconnected');
-        
-        // Delete the room
-        this.rooms.delete(roomCode);
-        
-        if (db) {
-          db('rooms')
-            .where({ id: room.id })
-            .update({ status: 'completed', completed_at: new Date() })
-            .catch(err => console.error('DB error updating room status:', err));
-        }
+        // Don't tear the room down immediately — a refresh reconnects shortly.
+        // host-room cancels this timer when the screen comes back.
+        console.log(`Host left room ${roomCode}; ${HOST_GRACE_MS / 1000}s grace before closing.`);
+        room.hostSocketId = null;
+        if (room.closeTimer) clearTimeout(room.closeTimer);
+        room.closeTimer = setTimeout(() => {
+          console.log(`Host did not return; closing room ${roomCode}.`);
+          this.io.to(roomCode).emit('host-disconnected');
+          this.rooms.delete(roomCode);
+          if (db) {
+            db('rooms')
+              .where({ id: room.id })
+              .update({ status: 'completed', completed_at: new Date() })
+              .catch(err => console.error('DB error updating room status:', err));
+          }
+        }, HOST_GRACE_MS);
         return;
       }
 
