@@ -1,210 +1,117 @@
-# CrowdPlay: Real-Time Multiplayer Synthwave Jigsaw Puzzle
+# CrowdPlay: Real-Time, Mobile-Controlled Big-Screen Activities
 
-Welcome to **CrowdPlay**, a real-time, mobile-controlled multiplayer jigsaw puzzle game built with Node.js, Express, and Socket.io. 
+**CrowdPlay** is a real-time, mobile-controlled platform for big-screen audience activities, built with Node.js, Express, and Socket.io. A shared **Big Screen** (TV/projector) displays the activity while players join from their **phones** via a 4-character room code.
 
-CrowdPlay is designed to run in a hybrid environment: a **Big Screen View** (e.g., a TV or projector) displays the shared puzzle board, while players connect using their **Mobile Controllers** via a simple 4-character room code to drag, drop, and snap puzzle pieces into place in real time.
-
----
-
-## 🎮 How It Works
-
-```mermaid
-flowchart TD
-    subgraph Clients [Frontend Clients]
-        Screen["🖥️ Big Screen View (Host)<br>/screen/:roomCode"]
-        Mobile["📱 Mobile Controller (Player)<br>/join/:roomCode"]
-        Admin["⚙️ Admin Panel<br>/admin"]
-    end
-
-    subgraph Server [Express & Socket.io Server]
-        NodeApp["Node.js Server (server.js)"]
-        RoomMgr["Room Manager (roomManager.js)"]
-        JigsawAct["Jigsaw Activity (jigsaw/index.js)"]
-    end
-
-    subgraph Storage ["Storage & Database"]
-        DB[(Knex DB: SQLite or Postgres)]
-        Cache[(Redis Cache / PubSub)]
-        S3Bucket["☁️ AWS S3 (or Local Fallback)"]
-    end
-
-    Screen <-->|Socket: host-room / piece-move| NodeApp
-    Mobile <-->|Socket: join-room / place-piece| NodeApp
-    Admin <-->|REST & Socket: admin-start-activity| NodeApp
-    
-    NodeApp <--> RoomMgr
-    RoomMgr <--> JigsawAct
-    
-    JigsawAct <-->|File operations & Fallbacks| S3Bucket
-    RoomMgr <-->|Sync room state| Cache
-    RoomMgr <-->|Save rooms / participants| DB
-```
-
-1. **Host Setup**: The host opens the **Big Screen View** at `/screen/DEMO` (or any generated room code). This establishes a Socket.io host connection.
-2. **Player Joins**: Players scan a QR code or visit `/join/[ROOM_CODE]`, enter their name, and get assigned a unique neon color.
-3. **Admin Launch**: The administrator uses the `/admin` dashboard to select a puzzle image (or upload one), configure the grid dimensions (rows/columns), and start the activity.
-4. **Gameplay**:
-   - The server uses the `sharp` library to slice the chosen image into grid pieces.
-   - The server assigns pieces to active players (up to 2 at a time).
-   - Players drag and drop pieces on their phone. Drag coordinates are synced live to the Big Screen.
-   - When a player drops a piece near its correct coordinates, it snaps into place, awards points, and gives the player new pieces until the puzzle is completed.
+It ships with two modes:
+- 🧩 **Collaborative Jigsaw** — the room solves one puzzle together, dragging pieces from their phones.
+- ☁️ **Live Audience Word Cloud** — attendees submit short responses that build a living word cloud on screen (with upvoting, sentiment, moderation, and a reveal summary).
 
 ---
 
-## 📂 Project Structure
+## ✨ What's New in This Fork
 
-```bash
-├── Dockerfile                  # Production container configuration
-├── server.js                   # Application entry point, server boot & SSL config
-├── crowdplay.sqlite            # Local development SQLite database (auto-generated)
-├── public/                     # Static frontend files (HTML, CSS, JS)
-│   ├── index.html              # Landing page
-│   ├── admin.html / .js / .css # Admin panel to upload images & launch rooms
-│   ├── mobile.html / .js / .css# Mobile player controller UI
-│   ├── screen.html / .js / .css# Shared big screen viewer UI
-│   ├── style.css               # Shared layout stylesheet
-│   └── uploads/                # Local directory for uploaded puzzle images
-├── src/
-│   ├── config.js               # Central environment variable mapping
-│   ├── activities/             # Game modes / activities
-│   │   ├── base.js             # BaseActivity parent class defining lifecycles
-│   │   └── jigsaw/
-│   │       ├── index.js        # JigsawActivity game state logic
-│   │       └── puzzleGenerator.js # Slices image buffers into pieces using sharp
-│   ├── routes/                 # REST API endpoints
-│   │   ├── admin.js            # Admin authentication and image uploads
-│   │   └── room.js             # Room details fetching
-│   ├── services/               # DB, Cache, and S3 Storage clients
-│   │   ├── db.js               # Knex database wrapper (Postgres/SQLite)
-│   │   ├── redis.js            # Redis client (with an in-memory mock fallback)
-│   │   └── storage.js          # S3 client (with local fs fallback)
-│   └── socket/                 # Socket.io event architecture
-│       ├── index.js            # Gateway router for room and player socket events
-│       └── roomManager.js      # Active room and connection tracker
-└── infrastructure/
-    └── aws/
-        └── cloudformation.yaml # CloudFormation template for AWS ECS Fargate
-```
+This fork makes two meaningful additions to the upstream project, plus cleanup.
+
+### 1. A redesigned interface (UI/UX)
+A complete visual redesign in a warm **paper / neo-brutalist** style — chunky borders, hard offset shadows, expressive display type (Bricolage Grotesque) — across the landing, admin, big-screen, and mobile pages, with a **light/dark theme toggle** persisted to `localStorage`. *(The visual design was produced with AI assistance; it reskins the existing screens while preserving their structure and behaviour.)*
+
+### 2. A new game mode — Live Audience Word Cloud
+Implements the maintainer's own roadmap spec, [`docs/better-word-cloud-prd.md`](docs/better-word-cloud-prd.md), as a new activity plugged into the existing `BaseActivity` architecture — **the jigsaw mode is untouched.**
+
+| Feature | Detail |
+| :--- | :--- |
+| 📡 **Live updates** | Submissions appear on the big screen instantly over Socket.io. |
+| 🔤 **Term merging** | `AI`, `A.I.`, and `artificial intelligence` collapse into one word; filler words are ignored. |
+| 👍 **Upvoting** | Players tap words on their phone to upvote; the cloud sizes by **frequency + votes** and shows a `▲` badge. |
+| 🎨 **Sentiment mode** | One click tints words positive/neutral/negative with a live distribution bar. |
+| 🏁 **Close & reveal** | The host closes the session to a summary screen: top-words podium, totals, unique participants. |
+| 🚫 **Profanity filter** | Flagged words are auto-hidden (still recorded for the host). |
+| 🛡️ **Moderation** | The admin console shows a live response list with one-click hide. |
+| 📊 **CSV export** | One click on the big screen downloads all responses. |
+| ✅ **Tests** | `npm test` covers the text engine (merging, stop words, profanity, votes-as-weight, sentiment). |
+
+### 3. Repo hygiene & fixes
+- Added `.gitignore`; stopped committing `node_modules`, the local SQLite DB, and uploaded images.
+- Updated `sqlite3` to 6.x (prebuilt binaries for current Node.js).
+- Hardened LAN-IP detection for the join QR so it skips virtual adapters (WSL/Docker/VPNs) and prefers the real Wi-Fi/Ethernet.
 
 ---
 
-## 🚀 Quick Start (Development)
+## 🚀 Quick Start
 
-### 1. Prerequisites
-- **Node.js**: `v14.0.0` or higher is required.
-- **System Dependencies**: The `sharp` image-processing library compiles native binaries. Ensure your system tools are up to date.
-
-### 2. Installation
-Install dependencies in the root directory:
 ```bash
 npm install
-```
-
-### 3. Run the Server
-Launch the development server:
-```bash
 npm run dev
 ```
 
-### 4. First-Time Local Playthrough
-After `npm run dev` is running, keep that terminal open and use the URLs below.
+The dev server runs over **HTTPS** on port **3000** (self-signed cert — needed so phones can use interactive browser APIs on the LAN).
 
-#### Host / Big Screen
-Open this on the computer, TV, or projector that will show the shared puzzle board:
-```text
-https://localhost:3000/screen/DEMO
-```
+| Role | URL |
+| :--- | :--- |
+| Landing | `https://localhost:3000/` |
+| Admin   | `https://localhost:3000/admin` (password `admin123`) |
+| Big screen | `https://localhost:3000/screen/DEMO` |
+| Player  | `https://localhost:3000/join/DEMO` |
 
-This screen shows the room code and the shared puzzle board. Leave it open while people play.
+> On phones, open the join URL with your computer's LAN IP (the admin/screen show the correct join QR automatically) and accept the one-time "connection is not private" warning (**Advanced → Proceed**) — that's the self-signed dev cert.
 
-#### Admin
-Open this in another browser tab:
-```text
-https://localhost:3000/admin
-```
-
-Log in with the admin password. In local development, the default is:
-```text
-admin123
-```
-
-Then:
-1. Choose or upload a puzzle image.
-2. Set the puzzle rows and columns.
-3. Start the activity for room `DEMO`.
-
-#### Players
-Players should join from their phones using the same room code:
-```text
-https://<YOUR_LOCAL_IP>:3000/join/DEMO
-```
-
-Replace `<YOUR_LOCAL_IP>` with the IP address of the computer running the server, for example:
-```text
-https://192.168.1.5:3000/join/DEMO
-```
-
-Each player should:
-1. Open the join URL on their phone.
-2. Accept the browser warning for the self-signed development certificate.
-3. Enter their name.
-4. Use the phone screen to drag and drop assigned puzzle pieces.
-
-For a quick local test on the same computer, you can also open:
-```text
-https://localhost:3000/join/DEMO
+### Run the tests
+```bash
+npm test
 ```
 
 ---
 
-## 🔒 Crucial Dev Detail: SSL/HTTPS
-Mobile browsers block access to **Device Orientation API** (gyroscope/accelerometer) and other interactive touch gestures when running over unencrypted HTTP (except on `localhost`).
+## 🧩 Playing the Jigsaw
+1. Open the big screen at `/screen/DEMO`.
+2. In `/admin`, log in, choose **Collaborative Jigsaw**, set rows/columns (optionally upload an image), and **Create room → Start game**.
+3. Players join, drag pieces on their phones, and snap them into place together.
 
-To allow mobile devices on your local network to connect and function correctly:
-- In **development** (`NODE_ENV` not set to `production`), the server generates dynamic, **self-signed SSL certificates** on the fly using `selfsigned` and launches an **HTTPS** server.
-- The console will output:
-  ```
-  Running in DEVELOPMENT mode (Self-signed HTTPS server)...
-  Access Admin Dashboard: https://localhost:3000/admin
-  Access Screen view:     https://localhost:3000/screen/DEMO
-  ```
-- **To connect your phone**:
-  1. Find your computer's local IP address (e.g., `192.168.1.5`).
-  2. Navigate on your phone to `https://<YOUR_LOCAL_IP>:3000/join/DEMO`.
-  3. Your browser will show a warning ("Your connection is not private"). Click **Advanced -> Proceed** to bypass the self-signed warning.
+## ☁️ Running a Word Cloud
+1. Open the big screen at `/screen/DEMO`.
+2. In `/admin`, choose **Live Audience Word Cloud**, enter a prompt, pick a response length and submissions-per-person, then **Create room → Start game**.
+3. Players join, type a word or short phrase, and **Send to Screen**. They can **tap any word to upvote it**.
+4. On the big screen, the **Mode** button toggles Classic ↔ Sentiment colours; **Export CSV** downloads responses.
+5. Use the admin **Live responses** list to hide anything inappropriate.
+6. Hit **🏁 Close & Reveal** in the admin to show the final summary on the big screen.
+
+> Tip: open a few `/join/DEMO` tabs to simulate a crowd on one machine. Existing tabs are unaffected when a new player joins.
 
 ---
 
-## ⚙️ Configuration & Environment Variables
+## ⚙️ Configuration
 
-Create a `.env` file or set the following variables in your environment:
+Set via environment variables (all optional in development):
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `NODE_ENV` | Mode of operation (`development` or `production`) | `development` |
-| `PORT` | The port the application listens on | `3000` |
-| `DATABASE_URL` | PostgreSQL connection string. If omitted, falls back to SQLite | *None* |
-| `USE_SQLITE_FALLBACK` | Set to `false` to disable SQLite database fallback | `true` |
-| `SQLITE_PATH` | Path to the SQLite DB file | `../crowdplay.sqlite` |
-| `REDIS_URL` | Redis URL. If omitted, falls back to an In-Memory mock client | *None* |
-| `S3_BUCKET` | AWS S3 Bucket name for puzzle image storage | *None* |
-| `AWS_REGION` | AWS Region for the S3 bucket | `us-east-1` |
-| `AWS_ACCESS_KEY_ID` | IAM credential key for S3 uploads | *None* |
-| `AWS_SECRET_ACCESS_KEY` | IAM credential secret for S3 uploads | *None* |
-| `ADMIN_PASSWORD` | Password to log in to `/admin` | `admin123` |
-| `JWT_SECRET` | Secret key used to sign Admin JWT session tokens | `crowdplay-super-secret-key-change-in-prod` |
+| `NODE_ENV` | `development` or `production` | `development` |
+| `PORT` | Listen port | `3000` |
+| `HOST_IP` | Force the LAN IP used in join URLs/QR (useful behind VPNs) | *(auto-detected)* |
+| `DATABASE_URL` | Postgres connection string; falls back to SQLite | *None* |
+| `REDIS_URL` | Redis URL; falls back to an in-memory mock | *None* |
+| `ADMIN_PASSWORD` | Admin panel password | `admin123` |
+| `JWT_SECRET` | Secret for admin session tokens | *(dev default — set in prod)* |
 
 ---
 
-## ☁️ Production Deployment
+## 📝 Design Notes, Assumptions & Limitations
 
-In **production** (`NODE_ENV=production`):
-- The Node.js application runs as a standard **HTTP** server (dynamic SSL generation is skipped for performance).
-- SSL termination and HTTPS routing must be handled at the load-balancer level (e.g., AWS Application Load Balancer).
-- A health-check endpoint is available at `/health` returning HTTP 200 (required for target groups).
+- **Purely additive.** The word cloud is a new `BaseActivity`; jigsaw is unchanged and still passes an end-to-end test. `admin-start-activity` defaults to `jigsaw`, so older clients keep working.
+- **Zero new runtime dependencies.** The cloud is plain DOM + CSS; the text engine is hand-rolled and unit-tested.
+- **MVP scope by design.** Covers the PRD's "Must Have" set plus several "Should Have" items (upvoting, sentiment, profanity filter). Deferred per the PRD's own phasing: theme clustering, timeline-pulse view, AI-based grouping.
+- **Term merging is lightweight** (lower-casing, punctuation stripping, stop words, a small synonym map) — not semantic clustering.
+- **Sentiment is a small word-level lexicon**, not NLP; words outside it read as neutral. Easily extended in `src/activities/wordcloud/textUtils.js`.
+- **Upvoting** is one vote per word per participant, deduped server-side against in-memory session state. Votes are keyed by word string, so a word's tally persists even if the host later hides the response that introduced it (harmless for a live session).
+- **In-memory state.** Like the jigsaw mode, live activity state resets if the host disconnects; multi-server scaling would need the Redis pub/sub path fleshed out.
 
-### AWS ECS Fargate Deployment
-A complete CloudFormation template is provided under [cloudformation.yaml](infrastructure/aws/cloudformation.yaml) to provision:
-1. An **ECS Cluster** running tasks on Fargate.
-2. An **Application Load Balancer** with listener rules routing HTTPS traffic to HTTP container instances.
-3. Integration support for an RDS PostgreSQL database instance and AWS ElastiCache Redis.
+---
+
+## 📂 Where the changes live
+
+| Area | Files |
+| :--- | :--- |
+| Word cloud activity | `src/activities/wordcloud/{index,textUtils,textUtils.test}.js` |
+| Real-time events | `src/socket/index.js`, `src/socket/roomManager.js` |
+| Frontend (redesign + word cloud) | `public/{index,admin,mobile,screen}.html`, `public/{admin,mobile,screen,desktop}.js` |
+| LAN IP fix | `src/routes/room.js` |
